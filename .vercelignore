@@ -1,5 +1,4 @@
-# Never deploy these — they are repository content, not site content.
+# Never deploy these — repository content, not site content.
 sql/
-scripts/
 README.md
 .gitignore
