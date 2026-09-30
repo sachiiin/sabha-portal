@@ -1,4 +1,0 @@
-# Never deploy these — repository content, not site content.
-sql/
-README.md
-.gitignore
