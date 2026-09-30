@@ -1,0 +1,134 @@
+/* Thin theme layer over Tabler (MIT).
+   Tabler handles layout, components and dark mode; this file only
+   carries the Gharmandir identity and the few things Tabler lacks. */
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+
+:root,
+[data-bs-theme='light'] {
+  /* Saffron, not Tabler's default blue. */
+  --tblr-primary: #c8651a;
+  --tblr-primary-rgb: 200, 101, 26;
+  --tblr-primary-fg: #ffffff;
+  --tblr-link-color: #a3500f;
+  --tblr-link-color-rgb: 163, 80, 15;
+  --tblr-link-hover-color: #7d3c0a;
+  --tblr-body-bg: #faf7f2;
+  --tblr-border-radius: 7px;
+
+  --gm-good: #2f855a;
+  --gm-watch: #c8651a;
+  --gm-low: #c53030;
+  --gm-info: #2b6cb0;
+}
+
+[data-bs-theme='dark'] {
+  --tblr-primary: #e8944a;
+  --tblr-primary-rgb: 232, 148, 74;
+  --tblr-primary-fg: #1a1613;
+  --tblr-link-color: #e8944a;
+  --tblr-link-color-rgb: 232, 148, 74;
+  --tblr-link-hover-color: #f0ad6f;
+  --tblr-body-bg: #17161a;
+
+  --gm-good: #48bb78;
+  --gm-watch: #e8944a;
+  --gm-low: #fc8181;
+  --gm-info: #63b3ed;
+}
+
+/* ---------- brand ---------- */
+
+.gm-wordmark {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 1.45rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+  color: var(--tblr-body-color);
+}
+.gm-wordmark small {
+  display: block;
+  font-family: var(--tblr-font-sans-serif);
+  font-size: 0.6875rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--tblr-secondary);
+  margin-top: 2px;
+}
+
+.gm-mark {
+  width: 34px; height: 34px; flex: none;
+  border-radius: 9px;
+  background: var(--tblr-primary);
+  color: var(--tblr-primary-fg);
+  display: grid; place-items: center;
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 1.05rem;
+}
+
+/* ---------- attendance status ---------- */
+
+.gm-seg { display: inline-flex; border-radius: var(--tblr-border-radius); overflow: hidden; }
+.gm-seg .btn { border-radius: 0; min-width: 40px; padding: 0.28rem 0.55rem; font-size: 0.75rem; font-weight: 600; }
+
+.gm-mark-row {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--tblr-border-color);
+  border-radius: var(--tblr-border-radius);
+  margin-bottom: 0.4rem;
+  border-left-width: 3px;
+  border-left-color: transparent;
+  transition: border-color 0.12s;
+}
+.gm-mark-row[data-s='present'] { border-left-color: var(--gm-good); }
+.gm-mark-row[data-s='late']    { border-left-color: var(--gm-watch); }
+.gm-mark-row[data-s='excused'] { border-left-color: var(--gm-info); }
+.gm-mark-row[data-s='absent']  { border-left-color: var(--gm-low); }
+
+/* ---------- sabha dot grid ---------- */
+
+.gm-dots { display: flex; gap: 3px; flex-wrap: wrap; }
+.gm-dot {
+  width: 25px; height: 25px; border-radius: 5px;
+  display: grid; place-items: center;
+  font-size: 0.6875rem; font-weight: 600;
+  color: #fff;
+}
+.gm-dot--present { background: var(--gm-good); }
+.gm-dot--late    { background: var(--gm-watch); }
+.gm-dot--excused { background: var(--gm-info); }
+.gm-dot--absent  { background: var(--gm-low); }
+.gm-dot--none    { background: var(--tblr-border-color); color: var(--tblr-secondary); }
+
+/* ---------- trend ---------- */
+
+.gm-trend { display: flex; align-items: flex-end; gap: 5px; height: 96px; }
+.gm-trend__col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 3px; height: 100%; }
+.gm-trend__n { font-size: 0.6875rem; text-align: center; color: var(--tblr-secondary); }
+.gm-trend__bar { border-radius: 4px 4px 0 0; min-height: 4px; background: var(--tblr-primary); opacity: 0.85; }
+.gm-trend__x { display: flex; gap: 5px; margin-top: 5px; }
+.gm-trend__lbl { flex: 1; text-align: center; font-size: 0.625rem; color: var(--tblr-secondary); }
+
+/* ---------- misc ---------- */
+
+.gm-stat { font-size: 1.6rem; font-weight: 500; line-height: 1.15; }
+
+.gm-grid-table td, .gm-grid-table th { padding: 0.35rem 0.4rem; text-align: center; }
+.gm-grid-table td:first-child,
+.gm-grid-table th:first-child { text-align: left; white-space: nowrap; padding-left: 0.75rem; }
+
+.gm-login-shell {
+  min-height: 100vh;
+  display: grid; place-items: center;
+  padding: 2rem 1rem;
+}
+
+.progress-bar.bg-good  { background: var(--gm-good) !important; }
+.progress-bar.bg-watch { background: var(--gm-watch) !important; }
+.progress-bar.bg-low   { background: var(--gm-low) !important; }
+
+.text-good  { color: var(--gm-good) !important; }
+.text-watch { color: var(--gm-watch) !important; }
+.text-low   { color: var(--gm-low) !important; }

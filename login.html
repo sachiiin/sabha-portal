@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in &middot; Gharmandir</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/css/tabler.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="d-flex flex-column">
+
+<div class="gm-login-shell">
+  <div class="container container-tight">
+
+    <div class="text-center mb-4">
+      <div class="d-inline-flex align-items-center gap-2 mb-2">
+        <span class="gm-mark">ઘ</span>
+      </div>
+      <div class="gm-wordmark">Gharmandir<small>Sabha attendance &middot; Dasanudas</small></div>
+    </div>
+
+    <div class="card card-md">
+      <div class="card-body">
+        <h2 class="h4 text-center mb-4">Sign in to continue</h2>
+        <form id="form" autocomplete="on" novalidate>
+          <div class="mb-3">
+            <label class="form-label" for="email">Email</label>
+            <input type="email" id="email" class="form-control" placeholder="you@example.com"
+                   autocomplete="username" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="password">Password</label>
+            <input type="password" id="password" class="form-control"
+                   autocomplete="current-password" required>
+          </div>
+
+          <div class="alert alert-danger d-none py-2 px-3" id="err" role="alert"></div>
+
+          <div class="form-footer">
+            <button type="submit" class="btn btn-primary w-100" id="submit">Sign in</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <p class="text-secondary text-center mt-3 mb-0 small">
+      Sevaks are added by a house admin.
+    </p>
+
+  </div>
+</div>
+
+<script type="module">
+import { signIn } from './js/auth.js';
+import { sb } from './js/supabase.js';
+
+const form = document.getElementById('form');
+const err = document.getElementById('err');
+const submit = document.getElementById('submit');
+
+function fail(msg) {
+  err.textContent = msg;
+  err.classList.remove('d-none');
+}
+
+if (new URLSearchParams(location.search).get('e') === 'nolink') {
+  fail('That account is not linked to a mandir yet. Add a row to app_users.');
+}
+
+sb.auth.getSession().then(({ data }) => {
+  if (data.session) location.href = 'index.html';
+});
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  err.classList.add('d-none');
+
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  if (!email || !password) return fail('Enter your email and password.');
+
+  submit.disabled = true;
+  submit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing in';
+
+  try {
+    await signIn(email, password);
+    location.href = 'index.html';
+  } catch (ex) {
+    fail(ex.message);
+    submit.disabled = false;
+    submit.textContent = 'Sign in';
+  }
+});
+</script>
+</body>
+</html>

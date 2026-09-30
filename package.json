@@ -1,0 +1,11 @@
+{
+  "name": "sabha-portal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Weekly sabha attendance portal for Gharmandir Dasanudas",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/gen-config.mjs",
+    "dev": "python3 -m http.server 8000"
+  }
+}

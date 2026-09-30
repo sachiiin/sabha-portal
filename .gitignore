@@ -1,0 +1,12 @@
+# Your Supabase keys — never committed.
+js/config.js
+
+# Generated at build time on Vercel.
+node_modules/
+.vercel/
+
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
