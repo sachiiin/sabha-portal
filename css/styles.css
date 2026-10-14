@@ -87,6 +87,14 @@
 .gm-mark-row[data-s='excused'] { border-left-color: var(--gm-info); }
 .gm-mark-row[data-s='absent']  { border-left-color: var(--gm-low); }
 
+/* ---------- status legend ---------- */
+
+.gm-legend { display: flex; flex-direction: column; gap: 0.35rem; }
+.gm-legend--inline { flex-direction: row; flex-wrap: wrap; gap: 0.4rem 1.1rem; }
+.gm-legend__item { display: inline-flex; align-items: center; gap: 0.45rem; }
+.gm-legend__text { font-size: 0.8125rem; color: var(--tblr-body-color); }
+.gm-legend .gm-dot { width: 21px; height: 21px; font-size: 0.6875rem; flex: none; }
+
 /* ---------- sabha dot grid ---------- */
 
 .gm-dots { display: flex; gap: 3px; flex-wrap: wrap; }
@@ -116,6 +124,32 @@
 .gm-stat { font-size: 1.6rem; font-weight: 500; line-height: 1.15; }
 
 .gm-grid-table td, .gm-grid-table th { padding: 0.35rem 0.4rem; text-align: center; }
+
+/* A grid cell holding a reason. Tapping it opens the strip below the
+   grid — a tooltip alone is invisible on a touch screen. */
+.gm-cell-note {
+  position: relative;
+  padding: 0; border: none; background: none;
+  line-height: 0; cursor: pointer;
+  border-radius: 6px;
+}
+.gm-cell-note:focus-visible { outline: 2px solid var(--tblr-primary); outline-offset: 2px; }
+.gm-cell-note:hover .gm-dot { filter: brightness(1.12); }
+.gm-cell-note.is-open .gm-dot { box-shadow: 0 0 0 2px var(--tblr-body-bg), 0 0 0 4px var(--tblr-primary); }
+
+.gm-hasnote {
+  position: absolute; top: -2px; right: -2px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--tblr-body-color);
+  border: 1.5px solid var(--tblr-bg-surface, #fff);
+  pointer-events: none;
+}
+
+.gm-note-bar {
+  padding: 0.7rem 1rem;
+  border-top: 1px solid var(--tblr-border-color);
+  background: var(--tblr-bg-surface-secondary, rgba(0, 0, 0, 0.02));
+}
 .gm-grid-table td:first-child,
 .gm-grid-table th:first-child { text-align: left; white-space: nowrap; padding-left: 0.75rem; }
 
@@ -123,6 +157,12 @@
   min-height: 100vh;
   display: grid; place-items: center;
   padding: 2rem 1rem;
+}
+
+.gm-pin {
+  letter-spacing: 0.4em;
+  font-variant-numeric: tabular-nums;
+  padding-left: 0.4em; /* offsets the trailing letter-space so it looks centred */
 }
 
 .progress-bar.bg-good  { background: var(--gm-good) !important; }

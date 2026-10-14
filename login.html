@@ -22,74 +22,167 @@
 
     <div class="card card-md">
       <div class="card-body">
-        <h2 class="h4 text-center mb-4">Sign in to continue</h2>
-        <form id="form" autocomplete="on" novalidate>
-          <div class="mb-3">
-            <label class="form-label" for="email">Email</label>
-            <input type="email" id="email" class="form-control" placeholder="you@example.com"
-                   autocomplete="username" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label" for="password">Password</label>
-            <input type="password" id="password" class="form-control"
-                   autocomplete="current-password" required>
-          </div>
 
-          <div class="alert alert-danger d-none py-2 px-3" id="err" role="alert"></div>
+        <div class="alert alert-danger d-none py-2 px-3" id="err" role="alert"></div>
 
-          <div class="form-footer">
-            <button type="submit" class="btn btn-primary w-100" id="submit">Sign in</button>
-          </div>
-        </form>
+        <!-- PIN -->
+        <div id="pane-pin">
+          <h2 class="h4 text-center mb-1">Enter the house PIN</h2>
+          <p class="text-secondary text-center mb-4 small">
+            View the dashboard and attendance history.
+          </p>
+
+          <form id="pin-form" novalidate>
+            <div class="mb-3">
+              <label class="form-label" for="pin">House PIN</label>
+              <input type="password" id="pin" class="form-control form-control-lg text-center gm-pin"
+                     inputmode="numeric" autocomplete="off" enterkeyhint="go"
+                     placeholder="••••••" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100" id="pin-submit">
+              <i class="ti ti-lock-open me-1"></i> Continue
+            </button>
+          </form>
+
+          <div class="hr-text hr-text-center my-4">or</div>
+
+          <button class="btn w-100" id="to-admin">
+            <i class="ti ti-user-shield me-1"></i> Sign in as sevak
+          </button>
+        </div>
+
+        <!-- Email and password -->
+        <div id="pane-admin" hidden>
+          <h2 class="h4 text-center mb-1">Sevak sign-in</h2>
+          <p class="text-secondary text-center mb-4 small">
+            Record attendance and manage the roster.
+          </p>
+
+          <form id="admin-form" autocomplete="on" novalidate>
+            <div class="mb-3">
+              <label class="form-label" for="email">Email</label>
+              <input type="email" id="email" class="form-control" placeholder="you@example.com"
+                     autocomplete="username" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="password">Password</label>
+              <input type="password" id="password" class="form-control"
+                     autocomplete="current-password" enterkeyhint="go" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100" id="admin-submit">Sign in</button>
+          </form>
+
+          <div class="hr-text hr-text-center my-4">or</div>
+
+          <button class="btn w-100" id="to-pin">
+            <i class="ti ti-lock me-1"></i> Use the house PIN
+          </button>
+        </div>
+
       </div>
     </div>
 
     <p class="text-secondary text-center mt-3 mb-0 small">
-      Sevaks are added by a house admin.
+      Ask a house sevak for the PIN.
     </p>
 
   </div>
 </div>
 
 <script type="module">
-import { signIn } from './js/auth.js';
+import { signIn, signInWithPin } from './js/auth.js';
 import { sb } from './js/supabase.js';
+import { applyTheme } from './js/lib/ui.js';
 
-const form = document.getElementById('form');
+applyTheme();
+
 const err = document.getElementById('err');
-const submit = document.getElementById('submit');
+const panePin = document.getElementById('pane-pin');
+const paneAdmin = document.getElementById('pane-admin');
 
 function fail(msg) {
   err.textContent = msg;
   err.classList.remove('d-none');
 }
+function clearError() {
+  err.classList.add('d-none');
+}
+
+function show(which) {
+  clearError();
+  const pin = which === 'pin';
+  panePin.hidden = !pin;
+  paneAdmin.hidden = pin;
+  (pin ? document.getElementById('pin') : document.getElementById('email')).focus();
+}
+
+document.getElementById('to-admin').addEventListener('click', () => show('admin'));
+document.getElementById('to-pin').addEventListener('click', () => show('pin'));
 
 if (new URLSearchParams(location.search).get('e') === 'nolink') {
-  fail('That account is not linked to a mandir yet. Add a row to app_users.');
+  fail('That account is not linked to a mandir yet.');
+  show('admin');
 }
 
 sb.auth.getSession().then(({ data }) => {
   if (data.session) location.href = 'index.html';
 });
 
-form.addEventListener('submit', async (e) => {
+// --- PIN ---
+
+const pinForm = document.getElementById('pin-form');
+const pinInput = document.getElementById('pin');
+const pinSubmit = document.getElementById('pin-submit');
+
+pinInput.addEventListener('input', clearError);
+
+pinForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  err.classList.add('d-none');
+  clearError();
+
+  const pin = pinInput.value.trim();
+  if (!pin) return fail('Enter the house PIN.');
+
+  pinSubmit.disabled = true;
+  pinSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Checking';
+
+  try {
+    await signInWithPin(pin);
+    location.href = 'index.html';
+  } catch (ex) {
+    fail(ex.message);
+    pinInput.value = '';
+    pinInput.focus();
+    pinSubmit.disabled = false;
+    pinSubmit.innerHTML = '<i class="ti ti-lock-open me-1"></i> Continue';
+  }
+});
+
+// --- email and password ---
+
+const adminForm = document.getElementById('admin-form');
+const adminSubmit = document.getElementById('admin-submit');
+
+adminForm.addEventListener('input', clearError);
+
+adminForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearError();
 
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
   if (!email || !password) return fail('Enter your email and password.');
 
-  submit.disabled = true;
-  submit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing in';
+  adminSubmit.disabled = true;
+  adminSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing in';
 
   try {
     await signIn(email, password);
     location.href = 'index.html';
   } catch (ex) {
     fail(ex.message);
-    submit.disabled = false;
-    submit.textContent = 'Sign in';
+    adminSubmit.disabled = false;
+    adminSubmit.textContent = 'Sign in';
   }
 });
 </script>

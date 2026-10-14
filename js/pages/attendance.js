@@ -2,7 +2,7 @@
 
 import { requireAuth } from '../auth.js';
 import {
-  renderChrome, applyTheme, pageHeader, esc, toast, showError, spinner
+  renderChrome, applyTheme, pageHeader, esc, toast, showError, spinner, statusLegend
 } from '../lib/ui.js';
 import { listMembers } from '../api/members.js';
 import { getSettings, getSabhaByDate, getOrCreateSabha, updateSabha } from '../api/sabhas.js';
@@ -28,7 +28,8 @@ init();
 
 async function init() {
   try {
-    profile = await requireAuth();
+    // write: true bounces a PIN session back to the dashboard.
+    profile = await requireAuth({ write: true });
     renderChrome(profile, 'attendance');
     settings = await getSettings(profile.mandirId);
     members = await listMembers(profile.mandirId);
@@ -158,12 +159,11 @@ function markingCard() {
             <small class="form-hint">Saved as you type away from the field.</small>
           </div>
           <div class="hr-text">Legend</div>
-          <div class="d-flex flex-column gap-1 small text-secondary">
-            <div><span class="gm-dot gm-dot--present d-inline-grid align-middle me-2">P</span> Present</div>
-            <div><span class="gm-dot gm-dot--late d-inline-grid align-middle me-2">L</span> Late, counts as attended</div>
-            <div><span class="gm-dot gm-dot--excused d-inline-grid align-middle me-2">E</span> Excused</div>
-            <div><span class="gm-dot gm-dot--absent d-inline-grid align-middle me-2">A</span> Absent</div>
-          </div>
+          ${statusLegend({ inline: false })}
+          <p class="text-secondary small mt-3 mb-0">
+            Marking someone excused or absent opens a reason box. Whatever you
+            type there shows up under Notes on the history page.
+          </p>
         </div>
       </div>
     </div>

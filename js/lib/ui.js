@@ -38,16 +38,25 @@ function paintThemeIcon() {
 
 /* ---------- chrome ---------- */
 
+// `roles` lists who sees the link. A PIN session ('viewer') gets the two
+// read-only pages; hiding the rest is courtesy, since row-level security
+// is what actually stops a viewer writing.
 const NAV = [
-  { href: 'index.html',      label: 'Dashboard',  icon: 'chart-pie',  key: 'dashboard' },
-  { href: 'attendance.html', label: 'Attendance', icon: 'checkbox',   key: 'attendance' },
-  { href: 'history.html',    label: 'History',    icon: 'calendar-stats', key: 'history' },
-  { href: 'members.html',    label: 'Members',    icon: 'users',      key: 'members' }
+  { href: 'index.html',      label: 'Dashboard',  icon: 'chart-pie',      key: 'dashboard',  roles: ['admin', 'sevak', 'viewer'] },
+  { href: 'attendance.html', label: 'Attendance', icon: 'checkbox',       key: 'attendance', roles: ['admin', 'sevak'] },
+  { href: 'history.html',    label: 'History',    icon: 'calendar-stats', key: 'history',    roles: ['admin', 'sevak', 'viewer'] },
+  { href: 'members.html',    label: 'Members',    icon: 'users',          key: 'members',    roles: ['admin', 'sevak'] },
+  { href: 'settings.html',   label: 'Settings',   icon: 'settings',       key: 'settings',   roles: ['admin'] }
 ];
+
+const ROLE_LABEL = { admin: 'Admin', sevak: 'Sevak', viewer: 'PIN access' };
 
 export function renderChrome(profile, active) {
   const host = document.getElementById('chrome');
   if (!host) return;
+
+  const nav = NAV.filter((n) => n.roles.includes(profile.role));
+  const roleLabel = ROLE_LABEL[profile.role] ?? profile.role;
 
   const initials = profile.name
     .split(' ').filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
@@ -76,13 +85,13 @@ export function renderChrome(profile, active) {
               <span class="avatar avatar-sm bg-primary-lt">${esc(initials)}</span>
               <div class="d-none d-xl-block ps-2">
                 <div>${esc(profile.name)}</div>
-                <div class="mt-1 small text-secondary text-capitalize">${esc(profile.role)}</div>
+                <div class="mt-1 small text-secondary">${esc(roleLabel)}</div>
               </div>
             </a>
             <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
               <span class="dropdown-header">${esc(profile.name)}</span>
               <span class="dropdown-item-text small text-secondary pb-2">
-                ${esc(profile.gharName)} &middot; ${esc(profile.role)}
+                ${esc(profile.gharName)} &middot; ${esc(roleLabel)}
               </span>
               <div class="dropdown-divider"></div>
               <a href="#" class="dropdown-item" id="signout">
@@ -99,7 +108,7 @@ export function renderChrome(profile, active) {
         <div class="navbar">
           <div class="container-xl">
             <ul class="navbar-nav">
-              ${NAV.map((n) => `
+              ${nav.map((n) => `
                 <li class="nav-item${n.key === active ? ' active' : ''}">
                   <a class="nav-link" href="${n.href}">
                     <span class="nav-link-icon d-md-none d-lg-inline-block">
@@ -134,6 +143,42 @@ export function pageHeader(title, subtitle, actions = '') {
       ${actions ? `<div class="col-auto ms-auto d-print-none"><div class="btn-list">${actions}</div></div>` : ''}
     </div>
   </div>`;
+}
+
+/* ---------- attendance status ---------- */
+
+// One definition of P/L/E/A, used by every page so the letters, colours
+// and wording never drift apart.
+export const STATUS = {
+  present: { letter: 'P', label: 'Present', note: '' },
+  late:    { letter: 'L', label: 'Late',    note: 'counts as attended' },
+  excused: { letter: 'E', label: 'Excused', note: 'told us beforehand' },
+  absent:  { letter: 'A', label: 'Absent',  note: '' }
+};
+
+export const STATUS_ORDER = ['present', 'late', 'excused', 'absent'];
+
+export function statusDot(status, title = '') {
+  const t = title ? ` title="${esc(title)}"` : '';
+  const s = STATUS[status];
+  if (!s) return `<span class="gm-dot gm-dot--none"${t}>–</span>`;
+  return `<span class="gm-dot gm-dot--${status}"${t}>${s.letter}</span>`;
+}
+
+// `inline` lays the four out in a row for a card footer; otherwise they
+// stack, which reads better in a narrow sidebar.
+export function statusLegend({ inline = true, notes = true } = {}) {
+  const items = STATUS_ORDER.map((k) => {
+    const s = STATUS[k];
+    return `<span class="gm-legend__item">
+      ${statusDot(k)}
+      <span class="gm-legend__text">
+        ${s.label}${notes && s.note ? ` <span class="text-secondary">— ${s.note}</span>` : ''}
+      </span>
+    </span>`;
+  }).join('');
+
+  return `<div class="gm-legend${inline ? ' gm-legend--inline' : ''}">${items}</div>`;
 }
 
 /* ---------- toasts ---------- */

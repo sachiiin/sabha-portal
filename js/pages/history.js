@@ -1,20 +1,20 @@
 // History — grid of members by sabha, the sabha list, and CSV export.
 
-import { requireAuth } from '../auth.js';
+import { requireAuth, canWrite } from '../auth.js';
 import {
-  renderChrome, applyTheme, pageHeader, esc, toast, showError, emptyState, spinner
+  renderChrome, applyTheme, pageHeader, esc, toast, showError, emptyState, spinner,
+  statusDot, statusLegend, STATUS
 } from '../lib/ui.js';
 import { listMembers, listStats } from '../api/members.js';
 import { listSabhas } from '../api/sabhas.js';
 import { fullHistory } from '../api/attendance.js';
 import { exportAttendance, exportSummary } from '../lib/export.js';
-import { formatShort } from '../lib/dates.js';
+import { formatShort, formatLong } from '../lib/dates.js';
 import { band } from '../lib/schedule.js';
 
 applyTheme();
 
 const main = document.getElementById('main');
-const LETTER = { present: 'P', late: 'L', excused: 'E', absent: 'A' };
 
 let profile, members, sabhas, rows, stats;
 
@@ -41,8 +41,13 @@ async function init() {
 function render() {
   const held = sabhas.filter((s) => !s.is_cancelled).slice(0, 15).reverse();
 
+  // Keyed by member and date so the grid can look up both the status and
+  // whatever the sevak typed in the reason box.
   const map = new Map();
-  for (const r of rows) map.set(`${r.members.full_name}|${r.sabhas.sabha_date}`, r.status);
+  for (const r of rows) {
+    map.set(`${r.members.full_name}|${r.sabhas.sabha_date}`,
+      { status: r.status, reason: r.reason });
+  }
 
   const actions = `
     <button class="btn" id="exp-detail"><i class="ti ti-download me-1"></i> Attendance CSV</button>
@@ -58,8 +63,13 @@ function render() {
       </div>
       ${held.length
         ? `<div class="table-responsive">${gridTable(held, map)}</div>
-           <div class="card-footer text-secondary small">
-             P present &middot; L late &middot; E excused &middot; A absent &middot; dash not recorded
+           <div class="gm-note-bar" id="note-bar" hidden></div>
+           <div class="card-footer">
+             ${statusLegend({ inline: true })}
+             <div class="text-secondary small mt-2">
+               A dash means that sabha was not recorded. A cell with a dot in the
+               corner has a note — tap it to read.
+             </div>
            </div>`
         : `<div class="card-body">${emptyState('calendar-off', 'Nothing recorded yet',
              'The grid fills in as you mark sabhas.')}</div>`}
@@ -92,6 +102,49 @@ function render() {
     exportSummary(stats, `dasanudas-summary-${new Date().toISOString().slice(0, 10)}.csv`);
     toast('Downloaded', 'success');
   });
+
+  wireNotes();
+}
+
+// Tapping a cell that has a reason writes it into the strip below the grid.
+// Tapping the same cell again clears it.
+function wireNotes() {
+  const bar = document.getElementById('note-bar');
+  if (!bar) return;
+
+  let open = null;
+
+  const close = () => {
+    bar.hidden = true;
+    open?.classList.remove('is-open');
+    open = null;
+  };
+
+  main.querySelectorAll('.gm-cell-note').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (open === btn) return close();
+
+      open?.classList.remove('is-open');
+      btn.classList.add('is-open');
+      open = btn;
+
+      const { who, when, status, note } = btn.dataset;
+      bar.innerHTML = `
+        <div class="d-flex align-items-start gap-2">
+          ${statusDot(status)}
+          <div class="flex-fill">
+            <div class="small">
+              <span class="fw-medium">${esc(who)}</span>
+              <span class="text-secondary">&middot; ${esc(when)} &middot; ${esc(STATUS[status].label)}</span>
+            </div>
+            <div class="mt-1">${esc(note)}</div>
+          </div>
+          <button type="button" class="btn-close" aria-label="Close note"></button>
+        </div>`;
+      bar.hidden = false;
+      bar.querySelector('.btn-close').addEventListener('click', close);
+    });
+  });
 }
 
 function gridTable(held, map) {
@@ -101,11 +154,34 @@ function gridTable(held, map) {
 
   const body = members.map((m) => {
     const cells = held.map((s) => {
-      const st = map.get(`${m.full_name}|${s.sabha_date}`);
-      return st
-        ? `<td><span class="gm-dot gm-dot--${st}">${LETTER[st]}</span></td>`
-        : '<td><span class="gm-dot gm-dot--none">–</span></td>';
+      const cell = map.get(`${m.full_name}|${s.sabha_date}`);
+
+      if (!cell) {
+        return `<td>${statusDot(null, `${formatShort(s.sabha_date)} — not recorded`)}</td>`;
+      }
+
+      const title = `${m.full_name} · ${formatShort(s.sabha_date)} — ${STATUS[cell.status].label}`
+        + (cell.reason ? `: ${cell.reason}` : '');
+
+      // Cells carrying a reason become buttons: a tooltip is invisible on a
+      // phone, so tapping writes the note into the strip under the grid.
+      if (cell.reason) {
+        return `<td>
+          <button type="button" class="gm-cell-note" title="${esc(title)}"
+                  data-who="${esc(m.full_name)}"
+                  data-when="${esc(formatLong(s.sabha_date))}"
+                  data-status="${cell.status}"
+                  data-note="${esc(cell.reason.trim())}">
+            ${statusDot(cell.status)}
+            <span class="gm-hasnote" aria-hidden="true"></span>
+            <span class="visually-hidden">Read the note</span>
+          </button>
+        </td>`;
+      }
+
+      return `<td>${statusDot(cell.status, title)}</td>`;
     }).join('');
+
     return `<tr><td>${esc(m.full_name)}</td>${cells}</tr>`;
   }).join('');
 
@@ -149,7 +225,9 @@ function sabhaList() {
             : `<span class="text-${band(pct)} fw-medium">${c.present}/${c.total}</span>`}
         </div>
         <div class="col-auto">
-          <a class="btn btn-sm" href="attendance.html?date=${s.sabha_date}">Open</a>
+          ${canWrite(profile)
+            ? `<a class="btn btn-sm" href="attendance.html?date=${s.sabha_date}">Open</a>`
+            : ''}
         </div>
       </div>
     </div>`;

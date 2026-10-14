@@ -1,9 +1,10 @@
 // Dashboard — the landing page.
 // House-wide metrics, attendance trend, roster, and a per-yuvak panel.
 
-import { requireAuth } from '../auth.js';
+import { requireAuth, canWrite } from '../auth.js';
 import {
-  renderChrome, applyTheme, pageHeader, esc, showError, emptyState, spinner
+  renderChrome, applyTheme, pageHeader, esc, showError, emptyState, spinner, toast,
+  statusDot, statusLegend
 } from '../lib/ui.js';
 import { listStats, listMembers } from '../api/members.js';
 import { getSettings } from '../api/sabhas.js';
@@ -24,6 +25,11 @@ async function init() {
   try {
     profile = await requireAuth();
     renderChrome(profile, 'dashboard');
+
+    if (new URLSearchParams(location.search).get('e') === 'readonly') {
+      toast('That page needs a sevak sign-in. PIN access is view-only.', 'info');
+      history.replaceState(null, '', 'index.html');
+    }
 
     [stats, members, trend, settings] = await Promise.all([
       listStats(profile.mandirId),
@@ -48,7 +54,7 @@ function render() {
   const followUp = stats.filter((s) => s.total > 0 && s.pct < threshold).length;
   const upcoming = nextSabha(today(), settings.thursday_anchor);
 
-  const action = upcoming
+  const action = upcoming && canWrite(profile)
     ? `<a href="attendance.html?date=${upcoming}" class="btn btn-primary">
          <i class="ti ti-checkbox me-1"></i> Take attendance
        </a>`
@@ -132,8 +138,10 @@ function rosterCard() {
     return `<div class="card">
       <div class="card-body">
         ${emptyState('users', 'No attendance recorded yet',
-          'Once you mark a sabha, everyone appears here ranked by turnout.',
-          '<a href="attendance.html" class="btn btn-primary">Take attendance</a>')}
+          'Once a sabha is marked, everyone appears here ranked by turnout.',
+          canWrite(profile)
+            ? '<a href="attendance.html" class="btn btn-primary">Take attendance</a>'
+            : '')}
       </div>
     </div>`;
   }
@@ -210,10 +218,12 @@ async function selectMember(id) {
     const extras = history.filter((h) => h.sabhas.sabha_type === 'extra');
     const miss = missedStreak(history);
 
-    const grid = [...history].reverse().map((h) => {
-      const ch = { present: 'P', late: 'L', excused: 'E', absent: 'A' }[h.status];
-      return `<span class="gm-dot gm-dot--${h.status}" title="${esc(formatShort(h.sabhas.sabha_date))}">${ch}</span>`;
-    }).join('');
+    const grid = [...history].reverse().map((h) =>
+      statusDot(
+        h.status,
+        formatShort(h.sabhas.sabha_date) + (h.reason ? ` — ${h.reason}` : '')
+      )
+    ).join('');
 
     host.innerHTML = `
       <div class="d-flex align-items-center gap-3 mb-3">
@@ -240,7 +250,8 @@ async function selectMember(id) {
 
       ${history.length ? `
         <div class="text-secondary small mb-1">Sabha by sabha, oldest first</div>
-        <div class="gm-dots mb-3">${grid}</div>
+        <div class="gm-dots mb-2">${grid}</div>
+        <div class="mb-3">${statusLegend({ inline: true, notes: false })}</div>
         <div class="row g-2">
           ${miniStat('Sunday', `${rate(sundays)}%`)}
           ${miniStat('Thursday', `${rate(thursdays)}%`)}

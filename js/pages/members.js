@@ -21,7 +21,7 @@ init();
 
 async function init() {
   try {
-    profile = await requireAuth();
+    profile = await requireAuth({ write: true });
     admin = isAdmin(profile);
     renderChrome(profile, 'members');
     await load();
