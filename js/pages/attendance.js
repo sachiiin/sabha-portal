@@ -7,6 +7,7 @@ import {
 import { listMembers } from '../api/members.js';
 import { getSettings, getSabhaByDate, getOrCreateSabha, updateSabha } from '../api/sabhas.js';
 import { getForSabha, markBulk, clearSabha } from '../api/attendance.js';
+import { absencesOn } from '../api/utilities.js';
 import { isSabhaDay, nextSabha, previousSabha, weekdayName, nearestScheduled }
   from '../lib/schedule.js';
 import { today, formatLong, formatShort, initials } from '../lib/dates.js';
@@ -23,6 +24,7 @@ const STATUSES = [
 
 let profile, settings, members, sabha;
 let marks = {}, reasons = {}, dateISO;
+let away = {};   // memberId -> { note, start_date, end_date }
 
 init();
 
@@ -45,7 +47,17 @@ async function init() {
 
 async function load() {
   main.innerHTML = spinner;
-  marks = {}; reasons = {}; sabha = null;
+  marks = {}; reasons = {}; sabha = null; away = {};
+
+  // Who is recorded as away on this date. Shown on the roster, but the
+  // buttons stay live — being away is a reason, not a verdict.
+  try {
+    for (const a of await absencesOn(profile.mandirId, dateISO)) {
+      away[a.member_id] = a;
+    }
+  } catch {
+    // A sevak with no access to absences should still be able to mark.
+  }
 
   // A date is "open for marking" if a sabha already exists there, or if
   // it falls on a normally scheduled day. Any other date can still be
@@ -96,9 +108,23 @@ function render() {
   wireRows(main);
   document.getElementById('save').addEventListener('click', save);
   document.getElementById('allpresent').addEventListener('click', () => {
-    for (const m of members) marks[m.id] = 'present';
+    // Anyone recorded as away is left untouched — marking him present
+    // would be the one mistake this button could quietly make.
+    let skipped = 0;
+    for (const m of members) {
+      if (away[m.id]) { skipped++; continue; }
+      marks[m.id] = 'present';
+    }
     refreshRows();
     refreshCount();
+    if (skipped) {
+      toast(
+        skipped === 1
+          ? '1 yuvak is away — left unmarked'
+          : `${skipped} yuvaks are away — left unmarked`,
+        'info'
+      );
+    }
   });
   document.getElementById('clear').addEventListener('click', doClear);
   document.getElementById('topic').addEventListener('change', async (e) => {
@@ -173,12 +199,20 @@ function markingCard() {
 function rowHTML(m) {
   const s = marks[m.id];
   const needsReason = s === 'absent' || s === 'excused';
+  const trip = away[m.id];
 
-  return `<div class="gm-mark-row" data-s="${s ?? ''}" id="row-${m.id}">
+  return `<div class="gm-mark-row${trip ? ' gm-mark-row--away' : ''}" data-s="${s ?? ''}" id="row-${m.id}">
     <span class="avatar avatar-xs bg-primary-lt">${esc(initials(m.full_name))}</span>
     <div class="flex-fill text-truncate">
       <span class="text-truncate">${esc(m.full_name)}</span>
       ${m.is_sevak ? '<span class="badge bg-primary-lt ms-1">Sevak</span>' : ''}
+      ${trip ? `<div class="gm-away-note">
+        <i class="ti ti-plane" aria-hidden="true"></i>
+        <span>${esc(trip.note)}</span>
+        <span class="text-secondary">
+          ${esc(formatShort(trip.start_date))} – ${esc(formatShort(trip.end_date))}
+        </span>
+      </div>` : ''}
     </div>
     <div class="gm-seg btn-group" role="group" aria-label="Status for ${esc(m.full_name)}">
       ${STATUSES.map((st) => `
@@ -199,7 +233,15 @@ function wireRows(scope) {
     b.addEventListener('click', () => {
       const { m, s } = b.dataset;
       marks[m] = marks[m] === s ? undefined : s;
-      if (marks[m] !== 'absent' && marks[m] !== 'excused') delete reasons[m];
+
+      if (marks[m] !== 'absent' && marks[m] !== 'excused') {
+        delete reasons[m];
+      } else if (!reasons[m] && away[m]) {
+        // He is away and we know why — start the reason box with that
+        // rather than making the sevak retype it.
+        reasons[m] = away[m].note;
+      }
+
       refreshRows();
       refreshCount();
     }));

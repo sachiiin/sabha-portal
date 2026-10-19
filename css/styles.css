@@ -82,6 +82,15 @@
   border-left-color: transparent;
   transition: border-color 0.12s;
 }
+.gm-mark-row--away { background: var(--tblr-bg-surface-secondary, rgba(0, 0, 0, 0.02)); }
+
+.gm-away-note {
+  display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
+  font-size: 0.75rem; margin-top: 2px;
+  color: var(--gm-watch);
+}
+.gm-away-note i { font-size: 0.9rem; }
+
 .gm-mark-row[data-s='present'] { border-left-color: var(--gm-good); }
 .gm-mark-row[data-s='late']    { border-left-color: var(--gm-watch); }
 .gm-mark-row[data-s='excused'] { border-left-color: var(--gm-info); }

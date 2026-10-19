@@ -8,7 +8,7 @@ import {
 import {
   listMembers, createMember, updateMember, deactivateMember, reactivateMember
 } from '../api/members.js';
-import { initials } from '../lib/dates.js';
+import { initials, formatShort } from '../lib/dates.js';
 
 applyTheme();
 
@@ -105,10 +105,27 @@ function formCard() {
             </select>
           </div>
           <div class="col-md-6 mb-3">
-            <label class="form-label" for="joined">Joined</label>
+            <label class="form-label" for="joined">Joined mandal</label>
             <input type="date" id="joined" class="form-control" value="${esc(e.joined_date ?? '')}">
           </div>
         </div>
+
+        <div class="hr-text">In the house</div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label" for="hstart">From</label>
+            <input type="date" id="hstart" class="form-control" value="${esc(e.house_start ?? '')}">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label" for="hend">Until</label>
+            <input type="date" id="hend" class="form-control" value="${esc(e.house_end ?? '')}">
+            <small class="form-hint">Leave blank if still here.</small>
+          </div>
+        </div>
+        <p class="text-secondary small">
+          These dates decide how a utility bill is split — only the days a yuvak
+          was actually living here are charged.
+        </p>
         <label class="form-check mb-3">
           <input class="form-check-input" type="checkbox" id="sevak" ${e.is_sevak ? 'checked' : ''}>
           <span class="form-check-label">House sevak</span>
@@ -122,6 +139,24 @@ function formCard() {
         </div>
       </form>
     </div>
+  </div>`;
+}
+
+// When this yuvak was in the house — the dates the bill split runs on.
+function houseSpan(m) {
+  if (!m.house_start && !m.house_end) {
+    return `<div class="text-secondary small">
+      <i class="ti ti-home-off" style="font-size:0.9em" aria-hidden="true"></i>
+      House dates not set
+    </div>`;
+  }
+
+  const from = m.house_start ? formatShort(m.house_start) : 'always';
+  const to = m.house_end ? formatShort(m.house_end) : 'now';
+
+  return `<div class="text-secondary small">
+    <i class="ti ti-home" style="font-size:0.9em" aria-hidden="true"></i>
+    ${esc(from)} – ${esc(to)}
   </div>`;
 }
 
@@ -139,6 +174,7 @@ function rowHTML(m) {
         <div class="text-secondary small text-truncate text-capitalize">
           ${esc(m.mandal)}${m.phone ? ` &middot; <span class="text-lowercase">${esc(m.phone)}</span>` : ''}
         </div>
+        ${houseSpan(m)}
       </div>
       ${admin ? `<div class="col-auto">
         ${m.is_active
@@ -208,6 +244,19 @@ async function onSubmit(ev) {
   };
   const joined = document.getElementById('joined').value;
   if (joined) fields.joined_date = joined;
+
+  // Blank clears the date rather than leaving the old one in place.
+  fields.house_start = document.getElementById('hstart').value || null;
+  fields.house_end = document.getElementById('hend').value || null;
+
+  if (fields.house_start && fields.house_end && fields.house_end < fields.house_start) {
+    const f = document.getElementById('hend');
+    f.classList.add('is-invalid');
+    f.focus();
+    f.addEventListener('input', () => f.classList.remove('is-invalid'), { once: true });
+    toast('The house end date is before the start date.', 'error');
+    return;
+  }
 
   try {
     if (editing) {

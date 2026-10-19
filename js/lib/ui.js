@@ -46,6 +46,7 @@ const NAV = [
   { href: 'attendance.html', label: 'Attendance', icon: 'checkbox',       key: 'attendance', roles: ['admin', 'sevak'] },
   { href: 'history.html',    label: 'History',    icon: 'calendar-stats', key: 'history',    roles: ['admin', 'sevak', 'viewer'] },
   { href: 'members.html',    label: 'Members',    icon: 'users',          key: 'members',    roles: ['admin', 'sevak'] },
+  { href: 'utilities.html',  label: 'Utility bills', icon: 'receipt',     key: 'utilities',  roles: ['admin'] },
   { href: 'settings.html',   label: 'Settings',   icon: 'settings',       key: 'settings',   roles: ['admin'] }
 ];
 

@@ -7,7 +7,7 @@ import { sb, unwrap } from '../supabase.js';
 export async function listMembers(mandirId, { includeInactive = false } = {}) {
   let q = sb
     .from('members')
-    .select('id, full_name, phone, email, mandal, is_sevak, is_active, joined_date')
+    .select('id, full_name, phone, email, mandal, is_sevak, is_active, joined_date, house_start, house_end')
     .eq('mandir_id', mandirId)
     .order('full_name');
 
