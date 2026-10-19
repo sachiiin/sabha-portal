@@ -6,7 +6,7 @@ import {
   renderChrome, applyTheme, pageHeader, esc, showError, emptyState, spinner, toast,
   statusDot, statusLegend
 } from '../lib/ui.js';
-import { listStats, listMembers } from '../api/members.js';
+import { listStats, listMembers, isCurrent } from '../api/members.js';
 import { getSettings } from '../api/sabhas.js';
 import {
   attendanceTrend, historyForMember, currentStreak, missedStreak
@@ -31,12 +31,20 @@ async function init() {
       history.replaceState(null, '', 'index.html');
     }
 
-    [stats, members, trend, settings] = await Promise.all([
+    let allStats, allMembers;
+    [allStats, allMembers, trend, settings] = await Promise.all([
       listStats(profile.mandirId),
       listMembers(profile.mandirId),
       attendanceTrend(profile.mandirId, 12),
       getSettings(profile.mandirId)
     ]);
+
+    // Previous members — those whose "Until" date has passed — are kept
+    // off the dashboard. Their history is still in the database and still
+    // counts toward utility bills; it just is not who lives here now.
+    members = allMembers.filter(isCurrent);
+    const live = new Set(members.map((m) => m.id));
+    stats = allStats.filter((s) => live.has(s.id));
 
     render();
     if (members.length) selectMember(members[0].id);

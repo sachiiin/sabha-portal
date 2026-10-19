@@ -52,6 +52,19 @@ const NAV = [
 
 const ROLE_LABEL = { admin: 'Admin', sevak: 'Sevak', viewer: 'PIN access' };
 
+// The house mark. Inline rather than an <img> so it inherits the chip's
+// colour and stays crisp at any size. The matching favicon.svg carries
+// its own orange tile.
+export const MARK_SVG = `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+  <circle cx="16" cy="7.2" r="2.2" fill="currentColor"/>
+  <g fill="none" stroke="currentColor" stroke-width="2.8"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5.5 16 16 8.5 26.5 16"/>
+    <path d="M8.5 15.5v9h15v-9"/>
+  </g>
+  <path d="M13.2 24.5v-4.2a2.8 2.8 0 0 1 5.6 0v4.2z" fill="currentColor"/>
+</svg>`;
+
 export function renderChrome(profile, active) {
   const host = document.getElementById('chrome');
   if (!host) return;
@@ -71,9 +84,9 @@ export function renderChrome(profile, active) {
         </button>
 
         <div class="navbar-brand navbar-brand-autodark d-flex align-items-center gap-2 pe-0 pe-md-3">
-          <span class="gm-mark">ઘ</span>
+          <span class="gm-mark">${MARK_SVG}</span>
           <span class="gm-wordmark">
-            ${esc(profile.mandirName)}<small>${esc(profile.gharName)}</small>
+            ${esc(profile.gharName)}<small>${esc(profile.mandirName)}</small>
           </span>
         </div>
 

@@ -3,6 +3,22 @@
 // hides the buttons, but the database is what actually stops it.
 
 import { sb, unwrap } from '../supabase.js';
+import { today } from '../lib/dates.js';
+
+// Was this yuvak living in the house on a given date?
+// Used by the attendance page against the sabha's own date, and by the
+// dashboard and history against today.
+export function livedHereOn(m, iso) {
+  if (m.house_start && iso < m.house_start) return false;
+  if (m.house_end && iso > m.house_end) return false;
+  return true;
+}
+
+// Still living here now. A yuvak whose "Until" date has passed is a
+// previous member and drops off the dashboard and history.
+export function isCurrent(m) {
+  return livedHereOn(m, today());
+}
 
 export async function listMembers(mandirId, { includeInactive = false } = {}) {
   let q = sb

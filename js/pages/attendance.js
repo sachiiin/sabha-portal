@@ -4,7 +4,7 @@ import { requireAuth } from '../auth.js';
 import {
   renderChrome, applyTheme, pageHeader, esc, toast, showError, spinner, statusLegend
 } from '../lib/ui.js';
-import { listMembers } from '../api/members.js';
+import { listMembers, livedHereOn } from '../api/members.js';
 import { getSettings, getSabhaByDate, getOrCreateSabha, updateSabha } from '../api/sabhas.js';
 import { getForSabha, markBulk, clearSabha } from '../api/attendance.js';
 import { absencesOn } from '../api/utilities.js';
@@ -27,15 +27,10 @@ let members = [];   // the roster narrowed to whoever lived here on dateISO
 let marks = {}, reasons = {}, dateISO;
 let away = {};      // memberId -> { note, start_date, end_date }
 
-// Someone who moved out last month should not appear on this month's
-// sabha — and someone who moves in next week should not appear on last
-// week's. Residency is checked against the sabha's own date, not today,
-// so reopening an old sabha still shows the people who were actually here.
-function livedHereOn(m, iso) {
-  if (m.house_start && iso < m.house_start) return false;
-  if (m.house_end && iso > m.house_end) return false;
-  return true;
-}
+// livedHereOn comes from the members API so the dashboard, history and
+// this page all agree on who was here. Note it is checked against the
+// sabha's own date, not today, so reopening an old sabha still shows the
+// people who were actually in the house back then.
 
 init();
 

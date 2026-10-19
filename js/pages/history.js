@@ -5,7 +5,7 @@ import {
   renderChrome, applyTheme, pageHeader, esc, toast, showError, emptyState, spinner,
   statusDot, statusLegend, STATUS
 } from '../lib/ui.js';
-import { listMembers, listStats } from '../api/members.js';
+import { listMembers, listStats, isCurrent } from '../api/members.js';
 import { listSabhas } from '../api/sabhas.js';
 import { fullHistory } from '../api/attendance.js';
 import { exportAttendance, exportSummary } from '../lib/export.js';
@@ -25,12 +25,21 @@ async function init() {
     profile = await requireAuth();
     renderChrome(profile, 'history');
 
-    [members, sabhas, rows, stats] = await Promise.all([
+    let allMembers, allStats;
+    [allMembers, sabhas, rows, stats] = await Promise.all([
       listMembers(profile.mandirId),
       listSabhas(profile.mandirId, { limit: 60 }),
       fullHistory(profile.mandirId),
       listStats(profile.mandirId)
     ]);
+
+    // Previous members drop off the grid and the summary export. Their
+    // rows stay in `rows`, so the per-sabha turnout counts below are
+    // still the real numbers for those dates.
+    allStats = stats;
+    members = allMembers.filter(isCurrent);
+    const live = new Set(members.map((m) => m.id));
+    stats = allStats.filter((s) => live.has(s.id));
 
     render();
   } catch (e) {

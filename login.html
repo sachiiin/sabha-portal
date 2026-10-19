@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sign in &middot; Gharmandir</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<title>Sign in &middot; Dasanudas</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/css/tabler.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
 <link rel="stylesheet" href="css/styles.css">
@@ -15,9 +16,9 @@
 
     <div class="text-center mb-4">
       <div class="d-inline-flex align-items-center gap-2 mb-2">
-        <span class="gm-mark">ઘ</span>
+        <span class="gm-mark gm-mark--lg" id="brand-mark"></span>
       </div>
-      <div class="gm-wordmark">Gharmandir<small>Sabha attendance &middot; Dasanudas</small></div>
+      <div class="gm-wordmark">Dasanudas<small>Gharmandir &middot; Sabha attendance</small></div>
     </div>
 
     <div class="card card-md">
@@ -92,9 +93,10 @@
 <script type="module">
 import { signIn, signInWithPin } from './js/auth.js';
 import { sb } from './js/supabase.js';
-import { applyTheme } from './js/lib/ui.js';
+import { applyTheme, MARK_SVG } from './js/lib/ui.js';
 
 applyTheme();
+document.getElementById('brand-mark').innerHTML = MARK_SVG;
 
 const err = document.getElementById('err');
 const panePin = document.getElementById('pane-pin');

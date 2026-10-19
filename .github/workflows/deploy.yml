@@ -41,7 +41,7 @@ jobs:
       - name: Assemble the site
         run: |
           mkdir -p _site
-          cp -r css js *.html _site/
+          cp -r css js *.html favicon.svg _site/
           # Never publish: schema, build tooling, repo docs.
           rm -rf _site/sql _site/scripts
           # Pages runs Jekyll by default, which ignores files starting
