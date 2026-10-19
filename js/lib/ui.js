@@ -89,11 +89,15 @@ export function renderChrome(profile, active) {
           <span class="navbar-toggler-icon"></span>
         </button>
 
-        <div class="navbar-brand d-flex align-items-center gap-2 mb-lg-3">
+        <div class="gm-brand">
           <span class="gm-mark">${MARK_SVG}</span>
           <span class="gm-wordmark">
             ${esc(profile.gharName)}<small>${esc(profile.mandirName)}</small>
           </span>
+          <button type="button" class="gm-collapse" id="sidebar-collapse"
+                  aria-label="Collapse the sidebar" aria-expanded="true">
+            <i class="ti ti-chevron-left"></i>
+          </button>
         </div>
 
         <div class="collapse navbar-collapse" id="sidebar-menu">
@@ -104,7 +108,6 @@ export function renderChrome(profile, active) {
                 <a class="nav-link" href="${n.href}"${n.key === active ? ' aria-current="page"' : ''}>
                   <span class="nav-link-icon"><i class="ti ti-${n.icon}"></i></span>
                   <span class="nav-link-title">${n.label}</span>
-                  <i class="ti ti-chevron-right gm-sidebar__chev"></i>
                 </a>
               </li>`).join('')}
           </ul>
@@ -145,12 +148,46 @@ export function renderChrome(profile, active) {
     </header>`;
 
   paintThemeIcon();
+  applyMini(readMini());
+
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+  document.getElementById('sidebar-collapse').addEventListener('click', () => {
+    applyMini(!readMini(), true);
+  });
   document.getElementById('signout').addEventListener('click', async (e) => {
     e.preventDefault();
     const { signOut } = await import('../auth.js');
     signOut();
   });
+}
+
+/* ---------- mini sidebar ---------- */
+
+const MINI_KEY = 'gm-sidebar-mini';
+
+function readMini() {
+  try { return localStorage.getItem(MINI_KEY) === '1'; } catch { return false; }
+}
+
+// Collapsing is a class on <body>, so the sidebar width and the page
+// offset move together and nothing has to measure anything.
+function applyMini(on, persist = false) {
+  document.body.classList.toggle('gm-mini', on);
+
+  const btn = document.getElementById('sidebar-collapse');
+  if (btn) {
+    btn.setAttribute('aria-expanded', String(!on));
+    btn.setAttribute('aria-label', on ? 'Expand the sidebar' : 'Collapse the sidebar');
+    btn.innerHTML = `<i class="ti ti-chevron-${on ? 'right' : 'left'}"></i>`;
+  }
+
+  if (persist) {
+    try { localStorage.setItem(MINI_KEY, on ? '1' : '0'); } catch {}
+  }
+
+  // Charts measure their container, so they need to re-fit once the
+  // width transition has finished.
+  setTimeout(() => window.dispatchEvent(new Event('resize')), 260);
 }
 
 // Page title block, placed at the top of #main by each page.

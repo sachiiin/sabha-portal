@@ -54,38 +54,119 @@
 .card-header .card-title { font-weight: 500; }
 .card-footer { border-top-color: var(--tblr-border-color); }
 
+/* Layout. The #sidebar wrapper means the aside is not a direct sibling
+   of .page-wrapper, so Tabler's own offset rule never fires — the page
+   offset is set here instead. --gm-side is the single source of truth
+   for the width, and mini mode just changes that number. */
+:root { --gm-side: 15rem; --gm-side-mini: 4.75rem; }
+
+@media (min-width: 992px) {
+  #sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: var(--gm-side);
+    z-index: 1030;
+    transition: width 0.22s ease;
+  }
+  .page-wrapper {
+    margin-left: var(--gm-side);
+    transition: margin-left 0.22s ease;
+    min-width: 0;                 /* lets wide tables shrink instead of overflowing */
+  }
+  body.gm-mini #sidebar { width: var(--gm-side-mini); }
+  body.gm-mini .page-wrapper { margin-left: var(--gm-side-mini); }
+}
+
 .gm-sidebar {
   border-right: 1px solid var(--tblr-border-color);
   background: var(--tblr-bg-surface);
+  height: 100%;
+  align-items: stretch;
 }
+.gm-sidebar > .container-fluid {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0.75rem 0;
+  height: 100%;
+  overflow-y: auto;
+  flex-wrap: nowrap;
+}
+
+.gm-brand {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.25rem 0.75rem 0.75rem;
+  min-width: 0;
+}
+.gm-brand .gm-wordmark { flex: 1; min-width: 0; overflow: hidden; }
+
+.gm-collapse {
+  flex: none;
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  border: 1px solid var(--tblr-border-color);
+  border-radius: 8px;
+  background: var(--tblr-bg-surface);
+  color: var(--tblr-secondary);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.gm-collapse:hover { color: var(--tblr-primary); border-color: var(--tblr-primary); }
+
 .gm-sidebar__label {
   font-size: 0.6875rem; letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--tblr-secondary); padding: 0 0.75rem; margin-bottom: 0.25rem;
+  color: var(--tblr-secondary); padding: 0 1.25rem; margin-bottom: 0.25rem;
 }
 .gm-sidebar .nav-link {
   border-radius: 11px;
   margin: 1px 0.5rem;
   padding: 0.6rem 0.75rem;
   display: flex; align-items: center; gap: 0.7rem;
+  color: var(--tblr-secondary);
+  white-space: nowrap;
 }
-.gm-sidebar .nav-link-icon { margin: 0; font-size: 1.1rem; opacity: 0.85; }
-.gm-sidebar .nav-link-title { flex: 1; }
-.gm-sidebar__chev { font-size: 0.9rem; opacity: 0.35; }
+.gm-sidebar .nav-link-icon { margin: 0; font-size: 1.15rem; flex: none; }
+.gm-sidebar .nav-link-title { flex: 1; min-width: 0; }
+
+/* Selected page: orange text and icon on a soft tint, rather than a
+   solid fill — easier to read and it matches the accent elsewhere. */
+.gm-sidebar .nav-item.active > .nav-link,
+.gm-sidebar .nav-item.active > .nav-link .nav-link-icon,
+.gm-sidebar .nav-item.active > .nav-link .nav-link-title {
+  color: var(--tblr-primary);
+}
 .gm-sidebar .nav-item.active > .nav-link {
-  background: var(--tblr-primary);
-  color: var(--tblr-primary-fg);
-  box-shadow: 0 6px 16px -6px rgba(200, 101, 26, 0.65);
+  background: var(--tblr-primary-lt, rgba(200, 101, 26, 0.12));
+  font-weight: 500;
 }
-.gm-sidebar .nav-item.active .gm-sidebar__chev { opacity: 0.8; }
 .gm-sidebar .nav-item:not(.active) > .nav-link:hover {
   background: var(--tblr-bg-surface-secondary, rgba(0, 0, 0, 0.03));
+  color: var(--tblr-body-color);
 }
+
+/* ---------- mini sidebar ---------- */
+
+body.gm-mini .gm-wordmark,
+body.gm-mini .gm-sidebar__label,
+body.gm-mini .gm-sidebar .nav-link-title { display: none; }
+
+body.gm-mini .gm-brand {
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem 0.75rem;
+}
+body.gm-mini .gm-sidebar .nav-link {
+  justify-content: center;
+  padding: 0.65rem 0;
+  margin: 2px 0.6rem;
+}
+body.gm-mini .gm-sidebar .nav-link-icon { font-size: 1.25rem; }
 
 .gm-topbar {
   background: transparent;
   border: none;
   box-shadow: none;
   padding-top: 0.75rem;
+  min-height: auto;
 }
 .gm-topbar__title {
   font-size: 1.35rem; font-weight: 500;
