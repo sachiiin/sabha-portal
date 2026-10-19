@@ -22,9 +22,20 @@ const STATUSES = [
   { k: 'absent',  label: 'Absent',  btn: 'danger' }
 ];
 
-let profile, settings, members, sabha;
+let profile, settings, roster, sabha;
+let members = [];   // the roster narrowed to whoever lived here on dateISO
 let marks = {}, reasons = {}, dateISO;
-let away = {};   // memberId -> { note, start_date, end_date }
+let away = {};      // memberId -> { note, start_date, end_date }
+
+// Someone who moved out last month should not appear on this month's
+// sabha — and someone who moves in next week should not appear on last
+// week's. Residency is checked against the sabha's own date, not today,
+// so reopening an old sabha still shows the people who were actually here.
+function livedHereOn(m, iso) {
+  if (m.house_start && iso < m.house_start) return false;
+  if (m.house_end && iso > m.house_end) return false;
+  return true;
+}
 
 init();
 
@@ -34,7 +45,7 @@ async function init() {
     profile = await requireAuth({ write: true });
     renderChrome(profile, 'attendance');
     settings = await getSettings(profile.mandirId);
-    members = await listMembers(profile.mandirId);
+    roster = await listMembers(profile.mandirId);
 
     const param = new URLSearchParams(location.search).get('date');
     dateISO = param || previousSabha(today(), settings.thursday_anchor) || today();
@@ -48,6 +59,8 @@ async function init() {
 async function load() {
   main.innerHTML = spinner;
   marks = {}; reasons = {}; sabha = null; away = {};
+
+  members = roster.filter((m) => livedHereOn(m, dateISO));
 
   // Who is recorded as away on this date. Shown on the roster, but the
   // buttons stay live — being away is a reason, not a verdict.
@@ -165,6 +178,7 @@ function markingCard() {
           </div>
         </div>
         <div class="card-body">
+          ${excludedNote()}
           <div id="rows">${members.map(rowHTML).join('')}</div>
         </div>
         <div class="card-footer d-flex flex-wrap gap-2">
@@ -197,6 +211,25 @@ function markingCard() {
       </div>
     </div>
   </div>`;
+}
+
+// Says why the roster is shorter than the member list, so a missing name
+// reads as deliberate rather than as a bug.
+function excludedNote() {
+  const out = roster.filter((m) => !livedHereOn(m, dateISO));
+  if (!out.length) return '';
+
+  const gone = out.filter((m) => m.house_end && dateISO > m.house_end);
+  const notYet = out.filter((m) => m.house_start && dateISO < m.house_start);
+
+  const bits = [];
+  if (gone.length) bits.push(`${gone.map((m) => m.full_name).join(', ')} had moved out`);
+  if (notYet.length) bits.push(`${notYet.map((m) => m.full_name).join(', ')} had not moved in`);
+
+  return `<p class="text-secondary small mb-3">
+    <i class="ti ti-info-circle" aria-hidden="true"></i>
+    Not on this roster: ${esc(bits.join('; '))} by this date.
+  </p>`;
 }
 
 function rowHTML(m) {

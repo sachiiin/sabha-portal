@@ -8,7 +8,7 @@ import {
 import {
   listMembers, createMember, updateMember, deactivateMember, reactivateMember
 } from '../api/members.js';
-import { initials, formatShort } from '../lib/dates.js';
+import { initials, formatShort, today } from '../lib/dates.js';
 
 applyTheme();
 
@@ -37,29 +37,63 @@ async function load() {
 }
 
 function render() {
-  const active = members.filter((m) => m.is_active);
-  const inactive = members.filter((m) => !m.is_active);
+  const now = today();
+
+  // A yuvak whose "Until" date has passed has moved out. He stays on the
+  // books — his old sabhas and his share of bills covering the months he
+  // lived here are still real — he just moves to his own table.
+  const moved = (m) => Boolean(m.house_end) && m.house_end < now;
+
+  const active = members.filter((m) => m.is_active && !moved(m));
+  const previous = members.filter((m) => m.is_active && moved(m));
+  const removed = members.filter((m) => !m.is_active);
 
   main.innerHTML = `
-    ${pageHeader('Members', `${active.length} active in ${esc(profile.gharName)}`)}
+    ${pageHeader('Members',
+      `${active.length} living in ${esc(profile.gharName)}`
+      + (previous.length ? ` &middot; ${previous.length} moved out` : ''))}
 
     <div class="row row-cards">
       <div class="col-12 ${admin ? 'col-lg-7' : ''}">
         <div class="card">
-          <div class="card-header"><h3 class="card-title">Active</h3></div>
+          <div class="card-header">
+            <h3 class="card-title">Active</h3>
+            <div class="card-actions text-secondary small">${active.length}</div>
+          </div>
           ${active.length
-            ? `<div class="list-group list-group-flush">${active.map(rowHTML).join('')}</div>`
+            ? `<div class="list-group list-group-flush">${active.map((m) => rowHTML(m, 'active')).join('')}</div>`
             : `<div class="card-body">${emptyState('users', 'No active members',
                  admin ? 'Add the first yuvak using the form.' : 'Ask an admin to add members.')}</div>`}
         </div>
 
-        ${inactive.length ? `
+        ${previous.length ? `
           <div class="card mt-3">
             <div class="card-header">
-              <h3 class="card-title text-secondary">Inactive</h3>
-              <div class="card-actions text-secondary small">${inactive.length}</div>
+              <h3 class="card-title">Previous members</h3>
+              <div class="card-actions text-secondary small">${previous.length}</div>
             </div>
-            <div class="list-group list-group-flush">${inactive.map(rowHTML).join('')}</div>
+            <div class="list-group list-group-flush">
+              ${previous.map((m) => rowHTML(m, 'previous')).join('')}
+            </div>
+            <div class="card-footer text-secondary small">
+              Not shown on the attendance page from the day after they left.
+              Still counted on utility bills for the days they were here —
+              deleting one takes them off those bills entirely.
+            </div>
+          </div>` : ''}
+
+        ${removed.length ? `
+          <div class="card mt-3">
+            <div class="card-header">
+              <h3 class="card-title text-secondary">Deleted</h3>
+              <div class="card-actions text-secondary small">${removed.length}</div>
+            </div>
+            <div class="list-group list-group-flush">
+              ${removed.map((m) => rowHTML(m, 'removed')).join('')}
+            </div>
+            <div class="card-footer text-secondary small">
+              Left out of every bill split and roster. Their past attendance is kept.
+            </div>
           </div>` : ''}
       </div>
 
@@ -160,8 +194,8 @@ function houseSpan(m) {
   </div>`;
 }
 
-function rowHTML(m) {
-  return `<div class="list-group-item${m.is_active ? '' : ' opacity-75'}">
+function rowHTML(m, table = 'active') {
+  return `<div class="list-group-item${table === 'active' ? '' : ' opacity-75'}">
     <div class="row align-items-center g-2">
       <div class="col-auto">
         <span class="avatar avatar-sm bg-primary-lt">${esc(initials(m.full_name))}</span>
@@ -176,21 +210,37 @@ function rowHTML(m) {
         </div>
         ${houseSpan(m)}
       </div>
-      ${admin ? `<div class="col-auto">
-        ${m.is_active
-          ? `<div class="btn-list flex-nowrap">
-               <button class="btn btn-sm btn-icon" data-edit="${m.id}" aria-label="Edit ${esc(m.full_name)}">
-                 <i class="ti ti-pencil"></i>
-               </button>
-               <button class="btn btn-sm btn-icon btn-ghost-danger" data-off="${m.id}"
-                       aria-label="Deactivate ${esc(m.full_name)}">
-                 <i class="ti ti-user-off"></i>
-               </button>
-             </div>`
-          : `<button class="btn btn-sm" data-on="${m.id}">Reactivate</button>`}
-      </div>` : ''}
+      ${admin ? `<div class="col-auto">${actions(m, table)}</div>` : ''}
     </div>
   </div>`;
+}
+
+// Which buttons a row gets depends on the table it is in.
+//   active    edit only — someone still here should not be deletable by
+//             accident; set an "Until" date instead and he moves down.
+//   previous  edit and delete
+//   removed   restore
+function actions(m, table) {
+  const edit = `<button class="btn btn-sm btn-icon" data-edit="${m.id}"
+                        aria-label="Edit ${esc(m.full_name)}">
+                  <i class="ti ti-pencil"></i>
+                </button>`;
+
+  if (table === 'removed') {
+    return `<button class="btn btn-sm" data-on="${m.id}">Restore</button>`;
+  }
+
+  if (table === 'previous') {
+    return `<div class="btn-list flex-nowrap">
+      ${edit}
+      <button class="btn btn-sm btn-icon btn-ghost-danger" data-off="${m.id}"
+              aria-label="Delete ${esc(m.full_name)}">
+        <i class="ti ti-trash"></i>
+      </button>
+    </div>`;
+  }
+
+  return edit;
 }
 
 function wireRowButtons() {
@@ -204,10 +254,16 @@ function wireRowButtons() {
   main.querySelectorAll('[data-off]').forEach((b) =>
     b.addEventListener('click', async () => {
       const m = members.find((x) => x.id === b.dataset.off);
-      if (!confirm(`Deactivate ${m.full_name}? Their past attendance is kept.`)) return;
+      if (!confirm(
+        `Delete ${m.full_name}?\n\n`
+        + 'He comes off every utility bill, including ones already recorded '
+        + 'for months he lived here. His past attendance is kept and he can '
+        + 'be restored later.'
+      )) return;
+
       try {
         await deactivateMember(m.id);
-        toast(`${m.full_name} deactivated`, 'success');
+        toast(`${m.full_name} deleted`, 'success');
         await load();
       } catch (e) { toast(e.message, 'error'); }
     }));
@@ -216,7 +272,7 @@ function wireRowButtons() {
     b.addEventListener('click', async () => {
       try {
         await reactivateMember(b.dataset.on);
-        toast('Reactivated', 'success');
+        toast('Restored', 'success');
         await load();
       } catch (e) { toast(e.message, 'error'); }
     }));
