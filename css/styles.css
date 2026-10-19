@@ -68,6 +68,20 @@
     z-index: 1030;
     transition: width 0.22s ease;
   }
+
+  /* Tabler puts width:15rem and position:fixed on .navbar-vertical itself.
+     Left alone, the panel keeps its full width inside the collapsed
+     wrapper and spills over the page. The wrapper owns position and
+     width now; the aside just fills it. */
+  #sidebar .navbar-vertical {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    inset: auto;
+    transform: none;
+  }
+
   .page-wrapper {
     margin-left: var(--gm-side);
     transition: margin-left 0.22s ease;
