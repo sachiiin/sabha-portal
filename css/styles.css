@@ -37,6 +37,79 @@
   --gm-info: #63b3ed;
 }
 
+/* ---------- shell ---------- */
+
+/* Softer, rounder surfaces than Tabler's default, and a page background
+   that lets white cards lift off it. */
+.card {
+  border-radius: 16px;
+  border-color: transparent;
+  box-shadow: 0 1px 2px rgba(16, 12, 8, 0.04), 0 8px 24px -12px rgba(16, 12, 8, 0.12);
+}
+[data-bs-theme='dark'] .card {
+  border-color: var(--tblr-border-color);
+  box-shadow: none;
+}
+.card-header { border-bottom-color: transparent; padding-bottom: 0.25rem; }
+.card-header .card-title { font-weight: 500; }
+.card-footer { border-top-color: var(--tblr-border-color); }
+
+.gm-sidebar {
+  border-right: 1px solid var(--tblr-border-color);
+  background: var(--tblr-bg-surface);
+}
+.gm-sidebar__label {
+  font-size: 0.6875rem; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--tblr-secondary); padding: 0 0.75rem; margin-bottom: 0.25rem;
+}
+.gm-sidebar .nav-link {
+  border-radius: 11px;
+  margin: 1px 0.5rem;
+  padding: 0.6rem 0.75rem;
+  display: flex; align-items: center; gap: 0.7rem;
+}
+.gm-sidebar .nav-link-icon { margin: 0; font-size: 1.1rem; opacity: 0.85; }
+.gm-sidebar .nav-link-title { flex: 1; }
+.gm-sidebar__chev { font-size: 0.9rem; opacity: 0.35; }
+.gm-sidebar .nav-item.active > .nav-link {
+  background: var(--tblr-primary);
+  color: var(--tblr-primary-fg);
+  box-shadow: 0 6px 16px -6px rgba(200, 101, 26, 0.65);
+}
+.gm-sidebar .nav-item.active .gm-sidebar__chev { opacity: 0.8; }
+.gm-sidebar .nav-item:not(.active) > .nav-link:hover {
+  background: var(--tblr-bg-surface-secondary, rgba(0, 0, 0, 0.03));
+}
+
+.gm-topbar {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding-top: 0.75rem;
+}
+.gm-topbar__title {
+  font-size: 1.35rem; font-weight: 500;
+  color: var(--tblr-body-color);
+}
+
+/* ---------- charts ---------- */
+
+.gm-chart { min-height: 260px; }
+.gm-donut-centre { text-align: center; }
+.gm-donut-centre__value { font-size: 1.75rem; font-weight: 500; line-height: 1.1; }
+
+.gm-range { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px;
+  background: var(--tblr-bg-surface-secondary, rgba(0, 0, 0, 0.04)); }
+.gm-range button {
+  border: none; background: none; cursor: pointer;
+  font-size: 0.75rem; font-weight: 500;
+  padding: 0.25rem 0.6rem; border-radius: 7px;
+  color: var(--tblr-secondary);
+}
+.gm-range button[aria-pressed='true'] {
+  background: var(--tblr-primary); color: var(--tblr-primary-fg);
+}
+
 /* ---------- brand ---------- */
 
 .gm-wordmark {

@@ -26,6 +26,10 @@ function toggleTheme() {
   document.documentElement.setAttribute('data-bs-theme', next);
   try { localStorage.setItem(THEME_KEY, next); } catch {}
   paintThemeIcon();
+
+  // Charts bake their colours in at render time, so they need to hear
+  // about this and redraw themselves.
+  document.dispatchEvent(new CustomEvent('gm:theme', { detail: { theme: next } }));
 }
 
 function paintThemeIcon() {
@@ -66,31 +70,54 @@ export const MARK_SVG = `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="
 </svg>`;
 
 export function renderChrome(profile, active) {
-  const host = document.getElementById('chrome');
-  if (!host) return;
+  const aside = document.getElementById('sidebar');
+  const top = document.getElementById('topbar');
+  if (!aside || !top) return;
 
   const nav = NAV.filter((n) => n.roles.includes(profile.role));
   const roleLabel = ROLE_LABEL[profile.role] ?? profile.role;
+  const current = nav.find((n) => n.key === active);
 
   const initials = profile.name
     .split(' ').filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
 
-  host.innerHTML = `
-    <header class="navbar navbar-expand-md d-print-none">
-      <div class="container-xl">
+  aside.innerHTML = `
+    <aside class="navbar navbar-vertical navbar-expand-lg gm-sidebar d-print-none">
+      <div class="container-fluid">
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-                data-bs-target="#nav-menu" aria-label="Toggle navigation">
+                data-bs-target="#sidebar-menu" aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
         </button>
 
-        <div class="navbar-brand navbar-brand-autodark d-flex align-items-center gap-2 pe-0 pe-md-3">
+        <div class="navbar-brand d-flex align-items-center gap-2 mb-lg-3">
           <span class="gm-mark">${MARK_SVG}</span>
           <span class="gm-wordmark">
             ${esc(profile.gharName)}<small>${esc(profile.mandirName)}</small>
           </span>
         </div>
 
-        <div class="navbar-nav flex-row order-md-last align-items-center">
+        <div class="collapse navbar-collapse" id="sidebar-menu">
+          <div class="gm-sidebar__label d-none d-lg-block">Pages</div>
+          <ul class="navbar-nav pt-lg-1">
+            ${nav.map((n) => `
+              <li class="nav-item${n.key === active ? ' active' : ''}">
+                <a class="nav-link" href="${n.href}"${n.key === active ? ' aria-current="page"' : ''}>
+                  <span class="nav-link-icon"><i class="ti ti-${n.icon}"></i></span>
+                  <span class="nav-link-title">${n.label}</span>
+                  <i class="ti ti-chevron-right gm-sidebar__chev"></i>
+                </a>
+              </li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    </aside>`;
+
+  top.innerHTML = `
+    <header class="navbar navbar-expand-md gm-topbar d-print-none">
+      <div class="container-xl">
+        <div class="gm-topbar__title">${esc(current?.label ?? '')}</div>
+
+        <div class="navbar-nav flex-row order-md-last align-items-center ms-auto">
           <button class="btn btn-ghost-secondary btn-icon me-1" id="theme-toggle"></button>
 
           <div class="nav-item dropdown">
@@ -112,26 +139,6 @@ export function renderChrome(profile, active) {
                 <i class="ti ti-logout me-2"></i> Sign out
               </a>
             </div>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <header class="navbar-expand-md">
-      <div class="collapse navbar-collapse" id="nav-menu">
-        <div class="navbar">
-          <div class="container-xl">
-            <ul class="navbar-nav">
-              ${nav.map((n) => `
-                <li class="nav-item${n.key === active ? ' active' : ''}">
-                  <a class="nav-link" href="${n.href}">
-                    <span class="nav-link-icon d-md-none d-lg-inline-block">
-                      <i class="ti ti-${n.icon} fs-2"></i>
-                    </span>
-                    <span class="nav-link-title">${n.label}</span>
-                  </a>
-                </li>`).join('')}
-            </ul>
           </div>
         </div>
       </div>

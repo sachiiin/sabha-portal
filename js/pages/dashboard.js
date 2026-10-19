@@ -9,16 +9,21 @@ import {
 import { listStats, listMembers, isCurrent } from '../api/members.js';
 import { getSettings } from '../api/sabhas.js';
 import {
-  attendanceTrend, historyForMember, currentStreak, missedStreak
+  attendanceTrend, fullHistory, historyForMember, currentStreak, missedStreak
 } from '../api/attendance.js';
 import { listAbsences } from '../api/utilities.js';
+import { areaChart, donutChart } from '../lib/charts.js';
 import { band, nextSabha } from '../lib/schedule.js';
 import { today, formatShort, formatLong, initials } from '../lib/dates.js';
 
 applyTheme();
 
 const main = document.getElementById('main');
-let profile, stats, members, trend, settings, absences = [];
+
+// Redraw when the light/dark toggle fires, so the gradients and grid
+// lines follow rather than staying stuck in the old palette.
+document.addEventListener('gm:theme', () => drawCharts());
+let profile, stats, members, trend, settings, absences = [], marks = [];
 
 init();
 
@@ -33,14 +38,17 @@ async function init() {
     }
 
     let allStats, allMembers;
-    [allStats, allMembers, trend, settings, absences] = await Promise.all([
+    [allStats, allMembers, trend, settings, absences, marks] = await Promise.all([
       listStats(profile.mandirId),
       listMembers(profile.mandirId),
-      attendanceTrend(profile.mandirId, 12),
+      // Pull the whole trend; the range pills slice it client-side so
+      // switching 6/12/All does not round-trip to the database.
+      attendanceTrend(profile.mandirId, 500),
       getSettings(profile.mandirId),
       // A PIN session can read these too, but never guarantee it —
       // an empty list is better than a dead dashboard.
-      listAbsences(profile.mandirId).catch(() => [])
+      listAbsences(profile.mandirId).catch(() => []),
+      fullHistory(profile.mandirId).catch(() => [])
     ]);
 
     // Previous members — those whose "Until" date has passed — are kept
@@ -95,11 +103,23 @@ function render() {
         ${rosterCard()}
       </div>
       <div class="col-12 col-lg-5">
+        ${trend.length ? mixCard() : ''}
         ${personalCard()}
       </div>
     </div>`;
 
   document.getElementById('pick')?.addEventListener('change', (e) => selectMember(e.target.value));
+
+  main.querySelectorAll('[data-range]').forEach((b) =>
+    b.addEventListener('click', () => {
+      if (range === b.dataset.range) return;
+      range = b.dataset.range;
+      main.querySelectorAll('[data-range]').forEach((x) =>
+        x.setAttribute('aria-pressed', String(x.dataset.range === range)));
+      drawCharts();
+    }));
+
+  drawCharts();
 }
 
 function statCard(label, value, icon, tone) {
@@ -178,27 +198,95 @@ function awayCard() {
   </div>`;
 }
 
+// How many sabhas the trend chart shows. Null means everything recorded.
+const RANGES = [
+  { key: '6',  label: '6' },
+  { key: '12', label: '12' },
+  { key: 'all', label: 'All' }
+];
+let range = '12';
+
+function visibleTrend() {
+  if (range === 'all') return trend;
+  return trend.slice(-Number(range));
+}
+
 function trendCard() {
-  const cols = trend.map((t) => {
-    const pct = Math.round((t.present / (t.total || 1)) * 100);
-    return `<div class="gm-trend__col">
-      <span class="gm-trend__n">${t.present}</span>
-      <div class="gm-trend__bar" style="height:${Math.max(pct * 0.68, 4)}px"></div>
-    </div>`;
-  }).join('');
-
-  const labels = trend
-    .map((t) => `<div class="gm-trend__lbl">${esc(formatShort(t.date).split(' ')[0])}</div>`)
-    .join('');
-
   return `<div class="card mb-3">
     <div class="card-header">
       <h3 class="card-title">Attendance by sabha</h3>
-      <div class="card-actions text-secondary small">last ${trend.length}</div>
+      <div class="card-actions">
+        <div class="gm-range" role="group" aria-label="How many sabhas to show">
+          ${RANGES.map((r) => `
+            <button type="button" data-range="${r.key}"
+                    aria-pressed="${range === r.key}">${r.label}</button>`).join('')}
+        </div>
+      </div>
     </div>
     <div class="card-body">
-      <div class="gm-trend">${cols}</div>
-      <div class="gm-trend__x">${labels}</div>
+      <div id="trend-chart" class="gm-chart"></div>
+    </div>
+  </div>`;
+}
+
+// Chart.render() needs its container to exist, so this runs after the
+// page HTML is in the DOM. Charts are torn down before redrawing or
+// ApexCharts leaves the old canvas behind.
+let trendChart = null;
+let mixChart = null;
+
+function drawCharts() {
+  trendChart?.destroy();
+  mixChart?.destroy();
+  trendChart = null;
+  mixChart = null;
+
+  // The library is a deferred CDN script. It should be ready by now, but
+  // on a cold cache it may not be — try again once the page has loaded,
+  // and give up quietly rather than throwing if the CDN is unreachable.
+  if (typeof ApexCharts === 'undefined') {
+    if (!drawCharts.waiting) {
+      drawCharts.waiting = true;
+      window.addEventListener('load', () => {
+        drawCharts.waiting = false;
+        drawCharts();
+      }, { once: true });
+    }
+    return;
+  }
+
+  const rows = visibleTrend();
+  const trendEl = document.getElementById('trend-chart');
+  if (trendEl && rows.length) {
+    trendChart = areaChart(trendEl, {
+      labels: rows.map((t) => formatShort(t.date)),
+      values: rows.map((t) => t.present),
+      total: Math.max(...rows.map((t) => t.total), members.length, 1)
+    });
+  }
+
+  const mixEl = document.getElementById('mix-chart');
+  if (mixEl) {
+    const dates = new Set(rows.map((t) => t.date));
+    const counts = { present: 0, late: 0, excused: 0, absent: 0 };
+    for (const r of marks) {
+      if (dates.has(r.sabhas.sabha_date) && counts[r.status] !== undefined) {
+        counts[r.status] += 1;
+      }
+    }
+    if (Object.values(counts).some((n) => n > 0)) {
+      mixChart = donutChart(mixEl, counts);
+    } else {
+      mixEl.innerHTML = '<p class="text-secondary small text-center py-4 mb-0">Nothing marked yet.</p>';
+    }
+  }
+}
+
+function mixCard() {
+  return `<div class="card mb-3">
+    <div class="card-header"><h3 class="card-title">How marks break down</h3></div>
+    <div class="card-body">
+      <div id="mix-chart"></div>
     </div>
   </div>`;
 }
