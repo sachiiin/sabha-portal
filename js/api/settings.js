@@ -7,10 +7,15 @@ export async function getHouseSettings(mandirId) {
   return unwrap(
     await sb
       .from('settings')
-      .select('thursday_anchor, sunday_enabled, followup_threshold, pin_set_at')
+      .select('thursday_anchor, sunday_enabled, followup_threshold, pin_set_at, monthly_rent')
       .eq('mandir_id', mandirId)
       .single()
   );
+}
+
+export async function setMonthlyRent(amount) {
+  const { error } = await sb.rpc('set_monthly_rent', { amount });
+  if (error) throw new Error(error.message);
 }
 
 export async function setHousePin(pin) {

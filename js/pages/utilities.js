@@ -9,15 +9,21 @@ import {
 import { listMembers } from '../api/members.js';
 import {
   listBills, createBill, deleteBill, billSplit,
-  listAbsences, createAbsence, deleteAbsence
+  listAbsences, createAbsence, deleteAbsence,
+  listCharges, createCharge, deleteCharge, setTransferred
 } from '../api/utilities.js';
+import { getHouseSettings, setMonthlyRent } from '../api/settings.js';
 import { formatShort, formatLong, today, initials } from '../lib/dates.js';
 
 applyTheme();
 
 const main = document.getElementById('main');
 
-let profile, members, bills, absences;
+// The house has exactly these three. Keeping them fixed is what lets the
+// owner-transfer table line a month's bills up into columns.
+const BILL_TYPES = ['Toronto Hydro', 'Enbridge Gas', 'Water/Utility'];
+
+let profile, members, bills, absences, settings, charges;
 let openBill = null;          // id of the bill whose split is expanded
 const splitCache = new Map(); // bill id -> rows, so reopening does not refetch
 
@@ -41,10 +47,12 @@ async function init() {
 
 async function load() {
   main.innerHTML = spinner;
-  [members, bills, absences] = await Promise.all([
+  [members, bills, absences, settings, charges] = await Promise.all([
     listMembers(profile.mandirId),
     listBills(profile.mandirId),
-    listAbsences(profile.mandirId)
+    listAbsences(profile.mandirId),
+    getHouseSettings(profile.mandirId),
+    listCharges(profile.mandirId)
   ]);
   render();
 }
@@ -61,12 +69,20 @@ function days(aISO, bISO) {
 
 /* ---------- render ---------- */
 
+const monthLabel = (iso) =>
+  new Date(iso.slice(0, 7) + '-01T00:00:00')
+    .toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
+
+// Bills not yet collected for. These are what the next count will take.
+const pending = () => bills.filter((b) => !b.charge_id);
+
 function render() {
   main.innerHTML = `
     ${pageHeader('Utility bills', `${bills.length} recorded &middot; ${esc(profile.gharName)}`)}
 
     <div class="row row-cards">
       <div class="col-12 col-xl-8">
+        ${transferCard()}
         ${billsCard()}
       </div>
       <div class="col-12 col-xl-4">
@@ -77,8 +93,216 @@ function render() {
 
   document.getElementById('bill-form').addEventListener('submit', onAddBill);
   document.getElementById('away-form').addEventListener('submit', onAddAway);
+  document.getElementById('edit-rent')?.addEventListener('click', onEditRent);
+  document.getElementById('count-total')?.addEventListener('click', onCountTotal);
+  wireChargeRows();
   wireBillRows();
   wireAwayRows();
+}
+
+/* ---------- transfer to owner ---------- */
+
+function transferCard() {
+  const rent = Number(settings.monthly_rent ?? 0);
+  const waiting = pending();
+  const waitingTotal = waiting.reduce((a, b) => a + Number(b.amount), 0);
+
+  const body = charges.length
+    ? charges.map((c) => {
+        const done = Boolean(c.transferred_at);
+        return `<tr>
+          <td class="text-nowrap">
+            ${esc(monthLabel(c.charge_month))}
+            ${c.note ? `<div class="small text-secondary">${esc(c.note)}</div>` : ''}
+          </td>
+          <td class="text-end text-nowrap text-secondary">${esc(money(c.rent_amount))}</td>
+          <td class="text-end text-nowrap text-secondary">${esc(money(c.utilities_amount))}</td>
+          <td class="text-end fw-medium text-nowrap">${esc(money(c.total))}</td>
+          <td class="text-center">
+            <label class="form-check form-check-single mb-0 d-inline-flex"
+                   title="${done ? 'Transferred ' + esc(formatShort(c.transferred_at.slice(0, 10))) : 'Not transferred yet'}">
+              <input class="form-check-input" type="checkbox" data-paid="${c.id}"
+                     ${done ? 'checked' : ''}
+                     aria-label="Transferred to owner for ${esc(monthLabel(c.charge_month))}">
+            </label>
+          </td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-ghost-danger btn-icon" data-del-charge="${c.id}"
+                    aria-label="Delete the ${esc(monthLabel(c.charge_month))} charge">
+              <i class="ti ti-trash"></i>
+            </button>
+          </td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="6" class="text-secondary text-center py-4">
+         Nothing counted yet.
+       </td></tr>`;
+
+  const owing = charges.filter((c) => !c.transferred_at);
+  const owed = owing.reduce((a, c) => a + Number(c.total), 0);
+
+  return `<div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title">Transfer to owner</h3>
+      <div class="card-actions d-flex align-items-center gap-2">
+        <span class="text-secondary small">Rent ${esc(money(rent))}</span>
+        <button class="btn btn-sm btn-ghost-secondary btn-icon" id="edit-rent"
+                aria-label="Change the monthly rent">
+          <i class="ti ti-pencil"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="card-body border-bottom">
+      ${waiting.length
+        ? `<div class="text-secondary small mb-2">
+             ${waiting.length} bill${waiting.length === 1 ? '' : 's'} waiting to be counted
+           </div>
+           <ul class="gm-pending">
+             ${waiting.map((b) => `<li>
+               <span>${esc(b.name)}</span>
+               <span class="text-secondary">
+                 ${esc(formatShort(b.period_start))} – ${esc(formatShort(b.period_end))}
+               </span>
+               <span class="fw-medium">${esc(money(b.amount))}</span>
+             </li>`).join('')}
+           </ul>
+           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-3">
+             <div>
+               <span class="text-secondary small">Rent ${esc(money(rent))} + bills ${esc(money(waitingTotal))}</span>
+               <div class="h3 mb-0">${esc(money(rent + waitingTotal))}</div>
+             </div>
+             <button class="btn btn-primary" id="count-total">
+               <i class="ti ti-calculator me-1"></i> Count total
+             </button>
+           </div>`
+        : `<div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+             <div>
+               <div class="text-secondary small">No new bills since the last count</div>
+               <div class="h3 mb-0">${esc(money(rent))}</div>
+               <div class="text-secondary small">rent only</div>
+             </div>
+             <button class="btn" id="count-total">
+               <i class="ti ti-calculator me-1"></i> Count total
+             </button>
+           </div>`}
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th class="text-end">Rent</th>
+            <th class="text-end">Utilities</th>
+            <th class="text-end">Total</th>
+            <th class="text-center">Paid</th>
+            <th style="width:3rem"></th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+
+    <div class="card-footer text-secondary small">
+      Counting a month takes every bill added since the last count and marks
+      them as collected, so the water bill is never charged twice.
+      ${owing.length
+        ? `<span class="text-watch"> ${owing.length} month${owing.length === 1 ? '' : 's'}
+           not yet transferred — ${esc(money(owed))}.</span>`
+        : ' Everything recorded has been transferred.'}
+    </div>
+  </div>`;
+}
+
+async function onCountTotal() {
+  const rent = Number(settings.monthly_rent ?? 0);
+  const waiting = pending();
+  const sum = waiting.reduce((a, b) => a + Number(b.amount), 0);
+
+  // Default to this month; rent is collected in the first week for the
+  // month ahead, so that is almost always the right answer.
+  const guess = today().slice(0, 7);
+  const answer = prompt(
+    `Which month is this for? (YYYY-MM)\n\n`
+    + `Rent ${money(rent)}\n`
+    + waiting.map((b) => `${b.name}  ${money(b.amount)}`).join('\n')
+    + (waiting.length ? '\n' : '')
+    + `Total ${money(rent + sum)}`,
+    guess
+  );
+  if (answer === null) return;
+
+  const month = answer.trim();
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    return toast('Use the form 2026-10', 'error');
+  }
+
+  const btn = document.getElementById('count-total');
+  btn.disabled = true;
+
+  try {
+    await createCharge(`${month}-01`, null);
+    toast(`${monthLabel(month + '-01')} counted — ${money(rent + sum)}`, 'success');
+    await load();
+  } catch (e) {
+    // The unique constraint is the likely one; say so in plain words.
+    toast(
+      /duplicate|unique/i.test(e.message)
+        ? 'That month has already been counted. Delete it first to recount.'
+        : e.message,
+      'error'
+    );
+    btn.disabled = false;
+  }
+}
+
+function wireChargeRows() {
+  main.querySelectorAll('[data-paid]').forEach((el) =>
+    el.addEventListener('change', async () => {
+      try {
+        await setTransferred(el.dataset.paid, el.checked, profile.id);
+        toast(el.checked ? 'Marked transferred' : 'Marked not transferred', 'success');
+        await load();
+      } catch (e) {
+        el.checked = !el.checked;
+        toast(e.message, 'error');
+      }
+    }));
+
+  main.querySelectorAll('[data-del-charge]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const c = charges.find((x) => x.id === b.dataset.delCharge);
+      if (!confirm(
+        `Delete the ${monthLabel(c.charge_month)} charge?\n\n`
+        + 'Its bills go back to waiting, so the next count will pick them up again.'
+      )) return;
+
+      try {
+        await deleteCharge(c.id);
+        toast('Charge deleted', 'success');
+        await load();
+      } catch (e) { toast(e.message, 'error'); }
+    }));
+}
+
+async function onEditRent() {
+  const current = Number(settings.monthly_rent ?? 0);
+  const answer = prompt('Monthly rent owed to the owner:', String(current));
+  if (answer === null) return;
+
+  const value = Number(answer.replace(/[^0-9.]/g, ''));
+  if (!Number.isFinite(value) || value < 0) {
+    return toast('Enter a number, like 3800', 'error');
+  }
+
+  try {
+    await setMonthlyRent(value);
+    toast(`Rent set to ${money(value)}`, 'success');
+    await load();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
 }
 
 function billsCard() {
@@ -103,7 +327,12 @@ function billsCard() {
             <i class="ti ti-chevron-${isOpen ? 'down' : 'right'}"></i>
           </button>
         </td>
-        <td class="text-nowrap">${esc(b.name)}</td>
+        <td class="text-nowrap">
+          ${esc(b.name)}
+          ${b.charge_id
+            ? '<div class="small text-secondary">collected</div>'
+            : '<div class="small text-watch">waiting</div>'}
+        </td>
         <td class="text-nowrap text-secondary">
           ${esc(formatShort(b.period_start))} – ${esc(formatShort(b.period_end))}
           <div class="small">${span} ${span === 1 ? 'day' : 'days'}</div>
@@ -149,14 +378,11 @@ function addBillCard() {
     <div class="card-body">
       <form id="bill-form" novalidate>
         <div class="mb-3">
-          <label class="form-label required" for="b-name">Bill name</label>
-          <input type="text" id="b-name" class="form-control" list="bill-names"
-                 placeholder="Hydro" required>
-          <datalist id="bill-names">
-            ${[...new Set(bills.map((b) => b.name))]
-              .map((n) => `<option value="${esc(n)}">`).join('')}
-          </datalist>
-          <small class="form-hint">Reuse the same name each time so bills group together.</small>
+          <label class="form-label required" for="b-name">Bill</label>
+          <select id="b-name" class="form-select" required>
+            <option value="">Choose…</option>
+            ${BILL_TYPES.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join('')}
+          </select>
         </div>
         <div class="row">
           <div class="col-6 mb-3">
@@ -456,7 +682,7 @@ async function onAddBill(ev) {
   const end = document.getElementById('b-end');
   const amount = document.getElementById('b-amount');
 
-  if (!name.value.trim()) return invalid(name, 'Give the bill a name.');
+  if (!name.value) return invalid(name, 'Choose which bill this is.');
   if (!start.value) return invalid(start, 'Pick the start of the period.');
   if (!end.value) return invalid(end, 'Pick the end of the period.');
   if (end.value < start.value) return invalid(end, 'The end date is before the start date.');
@@ -466,7 +692,7 @@ async function onAddBill(ev) {
 
   try {
     await createBill(profile.mandirId, {
-      name: name.value.trim(),
+      name: name.value,
       period_start: start.value,
       period_end: end.value,
       amount: Number(amount.value),

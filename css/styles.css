@@ -84,6 +84,16 @@
 }
 .gm-mark-row--away { background: var(--tblr-bg-surface-secondary, rgba(0, 0, 0, 0.02)); }
 
+/* Bills waiting to be counted into a monthly charge. */
+.gm-pending { list-style: none; margin: 0; padding: 0; }
+.gm-pending li {
+  display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap;
+  font-size: 0.8125rem;
+  padding: 0.3rem 0;
+}
+.gm-pending li + li { border-top: 1px solid var(--tblr-border-color); }
+.gm-pending li span:nth-child(2) { flex: 1; }
+
 /* Compact away list inside the dashboard's personal panel. */
 .gm-away-list { list-style: none; margin: 0; padding: 0; }
 .gm-away-item {

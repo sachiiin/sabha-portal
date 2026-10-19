@@ -8,10 +8,53 @@ export async function listBills(mandirId) {
   return unwrap(
     await sb
       .from('utility_bills')
-      .select('id, name, period_start, period_end, amount, notes, created_at')
+      .select('id, name, period_start, period_end, amount, notes, created_at, charge_id')
       .eq('mandir_id', mandirId)
       .order('period_end', { ascending: false })
       .order('name')
+  );
+}
+
+/* ---------- monthly charges ---------- */
+
+export async function listCharges(mandirId) {
+  return unwrap(
+    await sb
+      .from('monthly_charges')
+      .select('id, charge_month, rent_amount, utilities_amount, total, note, transferred_at, created_at')
+      .eq('mandir_id', mandirId)
+      .order('charge_month', { ascending: false })
+  );
+}
+
+// Rent plus every bill not yet collected for, stamped onto those bills
+// in one transaction so a double click cannot charge them twice.
+export async function createCharge(monthISO, note) {
+  const { data, error } = await sb.rpc('create_monthly_charge', {
+    p_month: monthISO,
+    p_note: note || null
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Deleting releases its bills back to uncharged.
+export async function deleteCharge(id) {
+  const { error } = await sb.from('monthly_charges').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+export async function setTransferred(id, done, byUserId) {
+  return unwrap(
+    await sb
+      .from('monthly_charges')
+      .update({
+        transferred_at: done ? new Date().toISOString() : null,
+        transferred_by: done ? byUserId : null
+      })
+      .eq('id', id)
+      .select()
+      .single()
   );
 }
 
