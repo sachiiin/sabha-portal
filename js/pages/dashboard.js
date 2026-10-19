@@ -11,13 +11,14 @@ import { getSettings } from '../api/sabhas.js';
 import {
   attendanceTrend, historyForMember, currentStreak, missedStreak
 } from '../api/attendance.js';
+import { listAbsences } from '../api/utilities.js';
 import { band, nextSabha } from '../lib/schedule.js';
 import { today, formatShort, formatLong, initials } from '../lib/dates.js';
 
 applyTheme();
 
 const main = document.getElementById('main');
-let profile, stats, members, trend, settings;
+let profile, stats, members, trend, settings, absences = [];
 
 init();
 
@@ -32,11 +33,14 @@ async function init() {
     }
 
     let allStats, allMembers;
-    [allStats, allMembers, trend, settings] = await Promise.all([
+    [allStats, allMembers, trend, settings, absences] = await Promise.all([
       listStats(profile.mandirId),
       listMembers(profile.mandirId),
       attendanceTrend(profile.mandirId, 12),
-      getSettings(profile.mandirId)
+      getSettings(profile.mandirId),
+      // A PIN session can read these too, but never guarantee it —
+      // an empty list is better than a dead dashboard.
+      listAbsences(profile.mandirId).catch(() => [])
     ]);
 
     // Previous members — those whose "Until" date has passed — are kept
@@ -86,6 +90,7 @@ function render() {
 
     <div class="row row-cards">
       <div class="col-12 col-lg-7">
+        ${awayCard()}
         ${trend.length ? trendCard() : ''}
         ${rosterCard()}
       </div>
@@ -113,6 +118,63 @@ function statCard(label, value, icon, tone) {
         </div>
       </div>
     </div>
+  </div>`;
+}
+
+// Who is out of the house right now, and who is about to be. Past trips
+// are history and belong on the History page, not here.
+function awayCard() {
+  const now = today();
+  const live = new Set(members.map((m) => m.id));
+
+  const upcoming = absences
+    .filter((a) => a.end_date >= now && live.has(a.member_id))
+    .sort((a, b) => a.start_date.localeCompare(b.start_date));
+
+  if (!upcoming.length) return '';
+
+  const rows = upcoming.map((a) => {
+    const on = a.start_date <= now;
+    const span = Math.round(
+      (new Date(a.end_date) - new Date(a.start_date)) / 86400000
+    ) + 1;
+
+    return `<div class="list-group-item">
+      <div class="row align-items-start g-2">
+        <div class="col-auto">
+          <span class="avatar avatar-sm bg-primary-lt">
+            ${esc(initials(a.members.full_name))}
+          </span>
+        </div>
+        <div class="col">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span>${esc(a.members.full_name)}</span>
+            <span class="badge ${on ? 'bg-orange-lt' : 'bg-secondary-lt'}">
+              ${on ? 'Away now' : 'From ' + esc(formatShort(a.start_date))}
+            </span>
+          </div>
+          <div class="text-secondary small">
+            ${esc(formatShort(a.start_date))} – ${esc(formatShort(a.end_date))}
+            &middot; ${span} ${span === 1 ? 'day' : 'days'}
+          </div>
+          <div class="small mt-1">${esc(a.note)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const nowCount = upcoming.filter((a) => a.start_date <= now).length;
+
+  return `<div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="ti ti-plane me-1" aria-hidden="true"></i> Away
+      </h3>
+      <div class="card-actions text-secondary small">
+        ${nowCount ? `${nowCount} out now` : 'none out today'}
+      </div>
+    </div>
+    <div class="list-group list-group-flush">${rows}</div>
   </div>`;
 }
 
@@ -265,10 +327,44 @@ async function selectMember(id) {
           ${miniStat('Thursday', `${rate(thursdays)}%`)}
           ${extras.length ? miniStat('Extra', `${rate(extras)}%`) : ''}
         </div>`
-        : '<p class="text-secondary small mb-0">No attendance recorded for this member yet.</p>'}`;
+        : '<p class="text-secondary small mb-0">No attendance recorded for this member yet.</p>'}
+
+      ${memberAway(id)}`;
   } catch (e) {
     showError(host, e.message);
   }
+}
+
+// This yuvak's trips, newest first. Explains a run of missed sabhas
+// without the sevak having to go looking for it.
+function memberAway(memberId) {
+  const now = today();
+  const mine = absences
+    .filter((a) => a.member_id === memberId)
+    .sort((a, b) => b.start_date.localeCompare(a.start_date))
+    .slice(0, 4);
+
+  if (!mine.length) return '';
+
+  const rows = mine.map((a) => {
+    const on = a.start_date <= now && a.end_date >= now;
+    const future = a.start_date > now;
+    return `<li class="gm-away-item">
+      <span class="gm-away-item__dates">
+        ${esc(formatShort(a.start_date))} – ${esc(formatShort(a.end_date))}
+      </span>
+      ${on ? '<span class="badge bg-orange-lt">now</span>'
+           : future ? '<span class="badge bg-secondary-lt">upcoming</span>' : ''}
+      <span class="gm-away-item__note">${esc(a.note)}</span>
+    </li>`;
+  }).join('');
+
+  return `<div class="mt-3 pt-3 border-top">
+    <div class="text-secondary small mb-2">
+      <i class="ti ti-plane" aria-hidden="true"></i> Away periods
+    </div>
+    <ul class="gm-away-list">${rows}</ul>
+  </div>`;
 }
 
 function miniStat(label, value, colour = '') {

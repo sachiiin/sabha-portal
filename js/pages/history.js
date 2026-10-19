@@ -8,15 +8,16 @@ import {
 import { listMembers, listStats, isCurrent } from '../api/members.js';
 import { listSabhas } from '../api/sabhas.js';
 import { fullHistory } from '../api/attendance.js';
+import { listAbsences } from '../api/utilities.js';
 import { exportAttendance, exportSummary } from '../lib/export.js';
-import { formatShort, formatLong } from '../lib/dates.js';
+import { formatShort, formatLong, initials, today } from '../lib/dates.js';
 import { band } from '../lib/schedule.js';
 
 applyTheme();
 
 const main = document.getElementById('main');
 
-let profile, members, sabhas, rows, stats;
+let profile, members, sabhas, rows, stats, absences = [];
 
 init();
 
@@ -26,11 +27,12 @@ async function init() {
     renderChrome(profile, 'history');
 
     let allMembers, allStats;
-    [allMembers, sabhas, rows, stats] = await Promise.all([
+    [allMembers, sabhas, rows, stats, absences] = await Promise.all([
       listMembers(profile.mandirId),
       listSabhas(profile.mandirId, { limit: 60 }),
       fullHistory(profile.mandirId),
-      listStats(profile.mandirId)
+      listStats(profile.mandirId),
+      listAbsences(profile.mandirId).catch(() => [])
     ]);
 
     // Previous members drop off the grid and the summary export. Their
@@ -83,6 +85,8 @@ function render() {
         : `<div class="card-body">${emptyState('calendar-off', 'Nothing recorded yet',
              'The grid fills in as you mark sabhas.')}</div>`}
     </div>
+
+    ${awayCard()}
 
     <div class="card">
       <div class="card-header"><h3 class="card-title">Sabhas</h3></div>
@@ -198,6 +202,62 @@ function gridTable(held, map) {
     <thead><tr><th>Member</th>${head}</tr></thead>
     <tbody>${body}</tbody>
   </table>`;
+}
+
+// Every away period, newest first, with how many recorded sabhas fell
+// inside it. That number is the point of the card — it turns "he missed
+// four in a row" into "he was in India for those four".
+function awayCard() {
+  if (!absences.length) return '';
+
+  const held = sabhas.filter((s) => !s.is_cancelled).map((s) => s.sabha_date);
+  const now = today();
+
+  const list = [...absences]
+    .sort((a, b) => b.start_date.localeCompare(a.start_date))
+    .map((a) => {
+      const span = Math.round(
+        (new Date(a.end_date) - new Date(a.start_date)) / 86400000
+      ) + 1;
+      const covered = held.filter((d) => d >= a.start_date && d <= a.end_date).length;
+      const on = a.start_date <= now && a.end_date >= now;
+      const future = a.start_date > now;
+
+      return `<div class="list-group-item${on || future ? '' : ' opacity-75'}">
+        <div class="row align-items-start g-2">
+          <div class="col-auto">
+            <span class="avatar avatar-sm bg-primary-lt">
+              ${esc(initials(a.members.full_name))}
+            </span>
+          </div>
+          <div class="col">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <span>${esc(a.members.full_name)}</span>
+              ${on ? '<span class="badge bg-orange-lt">away now</span>' : ''}
+              ${future ? '<span class="badge bg-secondary-lt">upcoming</span>' : ''}
+            </div>
+            <div class="text-secondary small">
+              ${esc(formatShort(a.start_date))} – ${esc(formatShort(a.end_date))}
+              &middot; ${span} ${span === 1 ? 'day' : 'days'}
+              ${covered
+                ? ` &middot; ${covered} ${covered === 1 ? 'sabha' : 'sabhas'} in this range`
+                : ''}
+            </div>
+            <div class="small mt-1">${esc(a.note)}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+  return `<div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title">
+        <i class="ti ti-plane me-1" aria-hidden="true"></i> Away periods
+      </h3>
+      <div class="card-actions text-secondary small">${absences.length}</div>
+    </div>
+    <div class="list-group list-group-flush">${list}</div>
+  </div>`;
 }
 
 function sabhaList() {

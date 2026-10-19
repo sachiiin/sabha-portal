@@ -84,6 +84,17 @@
 }
 .gm-mark-row--away { background: var(--tblr-bg-surface-secondary, rgba(0, 0, 0, 0.02)); }
 
+/* Compact away list inside the dashboard's personal panel. */
+.gm-away-list { list-style: none; margin: 0; padding: 0; }
+.gm-away-item {
+  display: flex; align-items: baseline; gap: 0.4rem; flex-wrap: wrap;
+  font-size: 0.8125rem;
+  padding: 0.3rem 0;
+}
+.gm-away-item + .gm-away-item { border-top: 1px solid var(--tblr-border-color); }
+.gm-away-item__dates { color: var(--tblr-secondary); white-space: nowrap; }
+.gm-away-item__note { flex: 1 1 100%; color: var(--tblr-body-color); }
+
 .gm-away-note {
   display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
   font-size: 0.75rem; margin-top: 2px;
