@@ -127,6 +127,7 @@ function render() {
     }
   });
   document.getElementById('clear').addEventListener('click', doClear);
+  document.getElementById('share').addEventListener('click', toggleShare);
   document.getElementById('topic').addEventListener('change', async (e) => {
     await updateSabha(sabha.id, { topic: e.target.value.trim() || null });
     toast('Topic saved', 'success');
@@ -169,8 +170,10 @@ function markingCard() {
         <div class="card-footer d-flex flex-wrap gap-2">
           <button class="btn btn-primary" id="save"><i class="ti ti-check me-1"></i> Save attendance</button>
           <button class="btn" id="allpresent"><i class="ti ti-users-group me-1"></i> All present</button>
+          <button class="btn" id="share"><i class="ti ti-brand-whatsapp me-1"></i> Share</button>
           <button class="btn btn-ghost-danger ms-auto" id="clear"><i class="ti ti-trash me-1"></i> Clear</button>
         </div>
+        <div id="share-pane" hidden></div>
       </div>
     </div>
 
@@ -340,6 +343,136 @@ async function createHere() {
     toast(e.message, 'error');
     btn.disabled = false;
   }
+}
+
+/* ---------- sharing ---------- */
+
+// Builds the summary as plain text with WhatsApp's own formatting marks
+// (*bold*). Reads whatever is on screen right now, so a sevak can share
+// straight after marking without saving first.
+function shareText() {
+  const label = { sunday: 'Sunday Sabha', thursday: 'Thursday Sabha', extra: 'Sabha' };
+  const lines = [];
+
+  lines.push(`*${label[sabha.sabha_type] ?? 'Sabha'}*`);
+  lines.push(formatLong(dateISO));
+  if (sabha.topic) lines.push(`Topic: ${sabha.topic}`);
+  if (sabha.moved_from) lines.push(`(moved from ${formatShort(sabha.moved_from)})`);
+
+  const groups = [
+    { key: 'present', title: 'Present' },
+    { key: 'late',    title: 'Late' },
+    { key: 'excused', title: 'Excused' },
+    { key: 'absent',  title: 'Absent' }
+  ];
+
+  // Anyone recorded away is kept out of the status groups and listed on
+  // his own. Being in India is not an attendance verdict, and counting
+  // him absent would drag the sabha's numbers down for no reason.
+  const here = members.filter((m) => !away[m.id]);
+  const trips = members.filter((m) => away[m.id]);
+
+  for (const g of groups) {
+    const who = here.filter((m) => marks[m.id] === g.key);
+    if (!who.length) continue;
+
+    lines.push('');
+    lines.push(`*${g.title} (${who.length})*`);
+
+    for (const m of who) {
+      const why = (reasons[m.id] ?? '').trim();
+      lines.push(`• ${m.full_name}${why ? ` — ${why}` : ''}`);
+    }
+  }
+
+  const unmarked = here.filter((m) => !marks[m.id]);
+  const notMarked = [...unmarked, ...trips];
+
+  if (notMarked.length) {
+    lines.push('');
+    lines.push(`*Not marked (${notMarked.length})*`);
+
+    for (const m of unmarked) {
+      lines.push(`• ${m.full_name}`);
+    }
+    for (const m of trips) {
+      // A typed reason wins over the stored note — the sevak may have
+      // corrected it while marking.
+      const why = (reasons[m.id] ?? '').trim() || away[m.id].note;
+      lines.push(`• ${m.full_name} — away, ${why}`);
+    }
+  }
+
+  const attended = here.filter(
+    (m) => marks[m.id] === 'present' || marks[m.id] === 'late'
+  ).length;
+
+  lines.push('');
+  lines.push(
+    `*Attended ${attended} of ${here.length}*`
+    + (trips.length ? ` (${trips.length} away)` : '')
+  );
+
+  return lines.join('\n');
+}
+
+function toggleShare() {
+  const pane = document.getElementById('share-pane');
+  if (!pane) return;
+
+  if (!pane.hidden) {
+    pane.hidden = true;
+    pane.innerHTML = '';
+    return;
+  }
+
+  if (!countMarked()) {
+    toast('Mark the roster first, then share.', 'error');
+    return;
+  }
+
+  const text = shareText();
+
+  pane.innerHTML = `
+    <div class="gm-share">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <span class="small text-secondary">Preview — edit after it opens in WhatsApp</span>
+        <button type="button" class="btn-close" id="share-close" aria-label="Close preview"></button>
+      </div>
+      <pre class="gm-share__text" id="share-text">${esc(text)}</pre>
+      <div class="btn-list mt-2">
+        <a class="btn btn-primary" id="share-wa"
+           href="https://wa.me/?text=${encodeURIComponent(text)}"
+           target="_blank" rel="noopener">
+          <i class="ti ti-brand-whatsapp me-1"></i> Open WhatsApp
+        </a>
+        <button type="button" class="btn" id="share-copy">
+          <i class="ti ti-copy me-1"></i> Copy
+        </button>
+      </div>
+    </div>`;
+
+  pane.hidden = false;
+
+  document.getElementById('share-close').addEventListener('click', toggleShare);
+  document.getElementById('share-copy').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Copied', 'success');
+    } catch {
+      // Clipboard is blocked outside a secure context; select it instead
+      // so the sevak can copy by hand.
+      const el = document.getElementById('share-text');
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      toast('Selected — press Ctrl+C to copy', 'info');
+    }
+  });
+
+  pane.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 async function save() {

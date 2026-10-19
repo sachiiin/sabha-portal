@@ -154,6 +154,27 @@
   pointer-events: none;
 }
 
+/* WhatsApp share preview on the attendance page. */
+.gm-share {
+  padding: 0.85rem 1rem;
+  border-top: 1px solid var(--tblr-border-color);
+  background: var(--tblr-bg-surface-secondary, rgba(0, 0, 0, 0.02));
+}
+.gm-share__text {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  max-height: 20rem;
+  overflow: auto;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--tblr-bg-surface);
+  border: 1px solid var(--tblr-border-color);
+  border-radius: var(--tblr-border-radius);
+  color: var(--tblr-body-color);
+}
+
 .gm-note-bar {
   padding: 0.7rem 1rem;
   border-top: 1px solid var(--tblr-border-color);
