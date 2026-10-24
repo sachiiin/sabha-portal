@@ -8,7 +8,8 @@ import {
 } from '../lib/ui.js';
 import { listMembers } from '../api/members.js';
 import {
-  listBills, createBill, deleteBill, billSplit,
+  listBills, createBill, updateBill, deleteBill, billSplit,
+  excludeFromBill, includeInBill, listExclusions,
   listAbsences, createAbsence, deleteAbsence,
   listCharges, createCharge, deleteCharge, setTransferred
 } from '../api/utilities.js';
@@ -25,7 +26,9 @@ const BILL_TYPES = ['Toronto Hydro', 'Enbridge Gas', 'Water/Utility'];
 
 let profile, members, bills, absences, settings, charges;
 let openBill = null;          // id of the bill whose split is expanded
+let editingBill = null;       // the bill the form is editing, or null to add
 const splitCache = new Map(); // bill id -> rows, so reopening does not refetch
+const reasonCache = new Map(); // bill id -> Map(member id -> why he is off it)
 
 init();
 
@@ -91,7 +94,11 @@ function render() {
       </div>
     </div>`;
 
-  document.getElementById('bill-form').addEventListener('submit', onAddBill);
+  document.getElementById('bill-form').addEventListener('submit', onSaveBill);
+  document.getElementById('b-cancel')?.addEventListener('click', () => {
+    editingBill = null;
+    render();
+  });
   document.getElementById('away-form').addEventListener('submit', onAddAway);
   document.getElementById('edit-rent')?.addEventListener('click', onEditRent);
   document.getElementById('count-total')?.addEventListener('click', onCountTotal);
@@ -339,10 +346,16 @@ function billsCard() {
         </td>
         <td class="text-end fw-medium text-nowrap">${esc(money(b.amount))}</td>
         <td class="text-end">
-          <button type="button" class="btn btn-sm btn-ghost-danger btn-icon"
-                  data-del-bill="${b.id}" aria-label="Delete ${esc(b.name)}">
-            <i class="ti ti-trash"></i>
-          </button>
+          <div class="btn-list flex-nowrap justify-content-end">
+            <button type="button" class="btn btn-sm btn-icon"
+                    data-edit-bill="${b.id}" aria-label="Edit ${esc(b.name)}">
+              <i class="ti ti-pencil"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost-danger btn-icon"
+                    data-del-bill="${b.id}" aria-label="Delete ${esc(b.name)}">
+              <i class="ti ti-trash"></i>
+            </button>
+          </div>
         </td>
       </tr>
       ${isOpen ? `<tr class="gm-split-row"><td colspan="5" class="p-0">
@@ -363,7 +376,7 @@ function billsCard() {
             <th>Bill</th>
             <th>Period</th>
             <th class="text-end">Amount</th>
-            <th style="width:3rem"></th>
+            <th style="width:5.5rem"></th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -372,26 +385,42 @@ function billsCard() {
   </div>`;
 }
 
+// One form for both jobs. Editing fills it from the bill and swaps the
+// button; cancelling drops back to adding.
 function addBillCard() {
-  return `<div class="card mb-3">
-    <div class="card-header"><h3 class="card-title">Add a bill</h3></div>
+  const e = editingBill ?? {};
+  const types = editingBill && !BILL_TYPES.includes(e.name)
+    ? [...BILL_TYPES, e.name]
+    : BILL_TYPES;
+
+  return `<div class="card mb-3${editingBill ? ' gm-editing' : ''}">
+    <div class="card-header">
+      <h3 class="card-title">${editingBill ? 'Edit bill' : 'Add a bill'}</h3>
+      ${editingBill
+        ? '<div class="card-actions"><button type="button" class="btn btn-sm" id="b-cancel">Cancel</button></div>'
+        : ''}
+    </div>
     <div class="card-body">
       <form id="bill-form" novalidate>
         <div class="mb-3">
           <label class="form-label required" for="b-name">Bill</label>
           <select id="b-name" class="form-select" required>
             <option value="">Choose…</option>
-            ${BILL_TYPES.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join('')}
+            ${types.map((t) =>
+              `<option value="${esc(t)}"${e.name === t ? ' selected' : ''}>${esc(t)}</option>`
+            ).join('')}
           </select>
         </div>
         <div class="row">
           <div class="col-6 mb-3">
             <label class="form-label required" for="b-start">From</label>
-            <input type="date" id="b-start" class="form-control" required>
+            <input type="date" id="b-start" class="form-control" required
+                   value="${esc(e.period_start ?? '')}">
           </div>
           <div class="col-6 mb-3">
             <label class="form-label required" for="b-end">To</label>
-            <input type="date" id="b-end" class="form-control" required>
+            <input type="date" id="b-end" class="form-control" required
+                   value="${esc(e.period_end ?? '')}">
           </div>
         </div>
         <div class="mb-3">
@@ -399,15 +428,24 @@ function addBillCard() {
           <div class="input-group">
             <span class="input-group-text">$</span>
             <input type="number" id="b-amount" class="form-control" step="0.01" min="0"
-                   placeholder="0.00" required>
+                   placeholder="0.00" required value="${esc(e.amount ?? '')}">
           </div>
         </div>
         <div class="mb-3">
           <label class="form-label" for="b-notes">Note</label>
-          <input type="text" id="b-notes" class="form-control" placeholder="Optional">
+          <input type="text" id="b-notes" class="form-control" placeholder="Optional"
+                 value="${esc(e.notes ?? '')}">
         </div>
+        ${editingBill && e.charge_id ? `
+          <div class="alert alert-warning py-2 px-3 small">
+            <i class="ti ti-alert-triangle me-1"></i>
+            This bill is already on a transfer to the owner. Changing the amount
+            will not change that month's total — delete and recount it if you
+            need the total to follow.
+          </div>` : ''}
         <button type="submit" class="btn btn-primary w-100">
-          <i class="ti ti-plus me-1"></i> Add bill
+          <i class="ti ti-${editingBill ? 'check' : 'plus'} me-1"></i>
+          ${editingBill ? 'Save changes' : 'Add bill'}
         </button>
       </form>
     </div>
@@ -498,9 +536,12 @@ async function showSplit(billId) {
   try {
     let rows = splitCache.get(billId);
     if (!rows) {
-      rows = await billSplit(billId);
+      const [split, excl] = await Promise.all([billSplit(billId), listExclusions(billId)]);
+      rows = split;
       splitCache.set(billId, rows);
+      reasonCache.set(billId, new Map(excl.map((x) => [x.member_id, x.reason])));
     }
+    const reasons = reasonCache.get(billId) ?? new Map();
 
     const bill = bills.find((b) => b.id === billId);
     const span = days(bill.period_start, bill.period_end);
@@ -532,17 +573,47 @@ async function showSplit(billId) {
                 <th class="text-end">Days here</th>
                 <th class="text-end">Days away</th>
                 <th class="text-end">Share</th>
+                <th style="width:3rem"></th>
               </tr>
             </thead>
             <tbody>
-              ${rows.map((r) => `<tr>
-                <td>${esc(r.full_name)}</td>
-                <td class="text-end">${r.days_present}</td>
-                <td class="text-end ${r.days_away ? 'text-watch' : 'text-secondary'}">
-                  ${r.days_away || '—'}
-                </td>
-                <td class="text-end fw-medium">${esc(money(r.share))}</td>
-              </tr>`).join('')}
+              ${rows.map((r) => r.excluded
+                ? `<tr class="gm-excluded">
+                    <td>
+                      ${esc(r.full_name)}
+                      <span class="badge bg-secondary-lt ms-1">off this bill</span>
+                      ${reasons.get(r.member_id)
+                        ? `<div class="small text-secondary">${esc(reasons.get(r.member_id))}</div>`
+                        : ''}
+                    </td>
+                    <td class="text-end text-secondary">—</td>
+                    <td class="text-end text-secondary">—</td>
+                    <td class="text-end text-secondary">${esc(money(0))}</td>
+                    <td class="text-end">
+                      <button type="button" class="btn btn-sm btn-icon"
+                              data-include="${r.member_id}" data-bill="${billId}"
+                              aria-label="Put ${esc(r.full_name)} back on this bill"
+                              title="Put him back on this bill">
+                        <i class="ti ti-plus"></i>
+                      </button>
+                    </td>
+                  </tr>`
+                : `<tr>
+                    <td>${esc(r.full_name)}</td>
+                    <td class="text-end">${r.days_present}</td>
+                    <td class="text-end ${r.days_away ? 'text-watch' : 'text-secondary'}">
+                      ${r.days_away || '—'}
+                    </td>
+                    <td class="text-end fw-medium">${esc(money(r.share))}</td>
+                    <td class="text-end">
+                      <button type="button" class="btn btn-sm btn-icon btn-ghost-secondary"
+                              data-exclude="${r.member_id}" data-bill="${billId}"
+                              aria-label="Take ${esc(r.full_name)} off this bill"
+                              title="Take him off this bill">
+                        <i class="ti ti-user-minus"></i>
+                      </button>
+                    </td>
+                  </tr>`).join('')}
             </tbody>
             <tfoot>
               <tr class="fw-medium">
@@ -552,6 +623,7 @@ async function showSplit(billId) {
                 <td class="text-end">${esc(money(
                   rows.reduce((a, r) => a + Number(r.share), 0)
                 ))}</td>
+                <td></td>
               </tr>
             </tfoot>
           </table>
@@ -569,8 +641,50 @@ async function showSplit(billId) {
 
     host.querySelector('[data-copy]').addEventListener('click', () => copySplit(billId));
     host.querySelector('[data-csv]').addEventListener('click', () => csvSplit(billId));
+
+    host.querySelectorAll('[data-exclude]').forEach((b) =>
+      b.addEventListener('click', () => onExclude(billId, b.dataset.exclude)));
+    host.querySelectorAll('[data-include]').forEach((b) =>
+      b.addEventListener('click', () => onInclude(billId, b.dataset.include)));
   } catch (e) {
     showError(host, e.message);
+  }
+}
+
+// Taking someone off a bill changes everyone else's share, so the split is
+// refetched rather than patched — Postgres owns that arithmetic.
+async function onExclude(billId, memberId) {
+  const row = (splitCache.get(billId) ?? []).find((r) => r.member_id === memberId);
+  const name = row?.full_name ?? 'this yuvak';
+
+  const reason = prompt(
+    `Take ${name} off this bill?\n\n`
+    + 'His days come out of the split entirely and the others cover the whole '
+    + 'amount between them.\n\nWhy (optional):',
+    ''
+  );
+  if (reason === null) return;
+
+  try {
+    await excludeFromBill(billId, memberId, reason.trim(), profile.id);
+    splitCache.delete(billId);
+    reasonCache.delete(billId);
+    toast(`${name} is off this bill`, 'success');
+    await showSplit(billId);
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+async function onInclude(billId, memberId) {
+  try {
+    await includeInBill(billId, memberId);
+    splitCache.delete(billId);
+    reasonCache.delete(billId);
+    toast('Back on the bill', 'success');
+    await showSplit(billId);
+  } catch (e) {
+    toast(e.message, 'error');
   }
 }
 
@@ -583,20 +697,25 @@ function chip(label, value) {
   </div>`;
 }
 
+// Anyone taken off the bill owes nothing, so he is left out of the message
+// and the CSV rather than listed at $0.00 for someone to query later.
 function splitLines(billId) {
   const bill = bills.find((b) => b.id === billId);
-  const rows = splitCache.get(billId) ?? [];
-  return { bill, rows };
+  const all = splitCache.get(billId) ?? [];
+  return { bill, rows: all.filter((r) => !r.excluded), off: all.filter((r) => r.excluded) };
 }
 
 async function copySplit(billId) {
-  const { bill, rows } = splitLines(billId);
+  const { bill, rows, off } = splitLines(billId);
   const text = [
     `${bill.name} — ${formatLong(bill.period_start)} to ${formatLong(bill.period_end)}`,
     `Total ${money(bill.amount)}`,
     '',
     ...rows.map((r) => `${r.full_name}: ${money(r.share)}`
-      + (r.days_away ? `  (away ${r.days_away} ${r.days_away === 1 ? 'day' : 'days'})` : ''))
+      + (r.days_away ? `  (away ${r.days_away} ${r.days_away === 1 ? 'day' : 'days'})` : '')),
+    ...(off.length
+      ? ['', `Not on this bill: ${off.map((r) => r.full_name).join(', ')}`]
+      : [])
   ].join('\n');
 
   try {
@@ -640,6 +759,13 @@ function wireBillRows() {
       if (openBill) showSplit(openBill);
     }));
 
+  main.querySelectorAll('[data-edit-bill]').forEach((b) =>
+    b.addEventListener('click', () => {
+      editingBill = bills.find((x) => x.id === b.dataset.editBill);
+      render();
+      document.getElementById('bill-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }));
+
   main.querySelectorAll('[data-del-bill]').forEach((b) =>
     b.addEventListener('click', async () => {
       const bill = bills.find((x) => x.id === b.dataset.delBill);
@@ -647,7 +773,9 @@ function wireBillRows() {
       try {
         await deleteBill(bill.id);
         splitCache.delete(bill.id);
+        reasonCache.delete(bill.id);
         if (openBill === bill.id) openBill = null;
+        if (editingBill?.id === bill.id) editingBill = null;
         toast('Bill deleted', 'success');
         await load();
       } catch (e) { toast(e.message, 'error'); }
@@ -674,7 +802,7 @@ function invalid(field, msg) {
   toast(msg, 'error');
 }
 
-async function onAddBill(ev) {
+async function onSaveBill(ev) {
   ev.preventDefault();
 
   const name = document.getElementById('b-name');
@@ -690,17 +818,29 @@ async function onAddBill(ev) {
     return invalid(amount, 'Enter the amount.');
   }
 
-  try {
-    await createBill(profile.mandirId, {
-      name: name.value,
-      period_start: start.value,
-      period_end: end.value,
-      amount: Number(amount.value),
-      notes: document.getElementById('b-notes').value.trim() || null
-    }, profile.id);
+  const fields = {
+    name: name.value,
+    period_start: start.value,
+    period_end: end.value,
+    amount: Number(amount.value),
+    notes: document.getElementById('b-notes').value.trim() || null
+  };
 
-    toast('Bill added', 'success');
-    ev.target.reset();
+  try {
+    if (editingBill) {
+      const id = editingBill.id;
+      await updateBill(id, fields);
+      // The period or the amount may have moved, so the cached split is
+      // no longer the truth.
+      splitCache.delete(id);
+      reasonCache.delete(id);
+      editingBill = null;
+      toast('Bill updated', 'success');
+    } else {
+      await createBill(profile.mandirId, fields, profile.id);
+      toast('Bill added', 'success');
+      ev.target.reset();
+    }
     await load();
   } catch (e) {
     toast(e.message, 'error');

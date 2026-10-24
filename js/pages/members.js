@@ -1,7 +1,8 @@
-// Member management. Admins can add, edit and deactivate;
-// sevaks get a read-only list.
+// Member management. Admins can add, edit and deactivate; sevaks and PIN
+// sessions get a read-only list. The read-only part is not a UI promise —
+// the restrictive policies in 06-pin-login.sql block the writes outright.
 
-import { requireAuth, isAdmin } from '../auth.js';
+import { requireAuth, isAdmin, canWrite } from '../auth.js';
 import {
   renderChrome, applyTheme, pageHeader, esc, toast, showError, emptyState, spinner
 } from '../lib/ui.js';
@@ -15,14 +16,15 @@ applyTheme();
 const main = document.getElementById('main');
 const MANDALS = ['bal', 'kishore', 'yuvak', 'adult', 'senior'];
 
-let profile, members, admin, editing = null;
+let profile, members, admin, sevak, editing = null;
 
 init();
 
 async function init() {
   try {
-    profile = await requireAuth({ write: true });
+    profile = await requireAuth();
     admin = isAdmin(profile);
+    sevak = canWrite(profile);
     renderChrome(profile, 'members');
     await load();
   } catch (e) {
@@ -32,7 +34,8 @@ async function init() {
 
 async function load() {
   main.innerHTML = spinner;
-  members = await listMembers(profile.mandirId, { includeInactive: true });
+  // A PIN session has no use for deleted members — that is bookkeeping.
+  members = await listMembers(profile.mandirId, { includeInactive: admin });
   render();
 }
 
@@ -51,7 +54,8 @@ function render() {
   main.innerHTML = `
     ${pageHeader('Members',
       `${active.length} living in ${esc(profile.gharName)}`
-      + (previous.length ? ` &middot; ${previous.length} moved out` : ''))}
+      + (previous.length ? ` &middot; ${previous.length} moved out` : '')
+      + (sevak ? '' : ' &middot; view only'))}
 
     <div class="row row-cards">
       <div class="col-12 ${admin ? 'col-lg-7' : ''}">
@@ -206,7 +210,9 @@ function rowHTML(m, table = 'active') {
           ${m.is_sevak ? '<span class="badge bg-primary-lt ms-1">Sevak</span>' : ''}
         </div>
         <div class="text-secondary small text-truncate text-capitalize">
-          ${esc(m.mandal)}${m.phone ? ` &middot; <span class="text-lowercase">${esc(m.phone)}</span>` : ''}
+          ${esc(m.mandal)}${sevak && m.phone
+            ? ` &middot; <span class="text-lowercase">${esc(m.phone)}</span>`
+            : ''}
         </div>
         ${houseSpan(m)}
       </div>

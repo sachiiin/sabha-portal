@@ -484,3 +484,17 @@ body.gm-mini .gm-sidebar .nav-link-icon { font-size: 1.25rem; }
 .text-good  { color: var(--gm-good) !important; }
 .text-watch { color: var(--gm-watch) !important; }
 .text-low   { color: var(--gm-low) !important; }
+
+/* ---------- utility bills ---------- */
+
+/* A yuvak taken off one bill. Dimmed rather than hidden, so it is obvious
+   at a glance that he was considered and left out, not forgotten. */
+.gm-excluded > td { opacity: 0.55; }
+.gm-excluded > td:first-child { opacity: 1; }
+.gm-excluded > td:first-child > :not(.badge):not(.small) { opacity: 0.6; }
+
+/* The add/edit form, while it is editing something. */
+.gm-editing {
+  outline: 2px solid var(--tblr-primary);
+  outline-offset: -2px;
+}

@@ -87,6 +87,41 @@ export async function billSplit(billId) {
   return data ?? [];
 }
 
+/* ---------- leaving someone off one bill ---------- */
+
+// Taking a yuvak off a bill removes his days from the split entirely, so
+// the others cover the whole amount between them. bill_split() does the
+// arithmetic; these two just set the flag.
+export async function excludeFromBill(billId, memberId, reason, byUserId) {
+  return unwrap(
+    await sb
+      .from('bill_exclusions')
+      .upsert(
+        { bill_id: billId, member_id: memberId, reason: reason || null, created_by: byUserId },
+        { onConflict: 'bill_id,member_id' }
+      )
+      .select()
+      .single()
+  );
+}
+
+export async function includeInBill(billId, memberId) {
+  const { error } = await sb
+    .from('bill_exclusions')
+    .delete()
+    .eq('bill_id', billId)
+    .eq('member_id', memberId);
+  if (error) throw new Error(error.message);
+}
+
+// Reasons for every exclusion on one bill, so the split table can say why
+// someone is off it rather than just showing a dash.
+export async function listExclusions(billId) {
+  return unwrap(
+    await sb.from('bill_exclusions').select('member_id, reason').eq('bill_id', billId)
+  );
+}
+
 /* ---------- away periods ---------- */
 
 export async function listAbsences(mandirId) {

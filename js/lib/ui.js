@@ -49,7 +49,10 @@ const NAV = [
   { href: 'index.html',      label: 'Dashboard',  icon: 'chart-pie',      key: 'dashboard',  roles: ['admin', 'sevak', 'viewer'] },
   { href: 'attendance.html', label: 'Attendance', icon: 'checkbox',       key: 'attendance', roles: ['admin', 'sevak'] },
   { href: 'history.html',    label: 'History',    icon: 'calendar-stats', key: 'history',    roles: ['admin', 'sevak', 'viewer'] },
-  { href: 'members.html',    label: 'Members',    icon: 'users',          key: 'members',    roles: ['admin', 'sevak'] },
+  // Viewers get the roster, read-only. Who lives in the house is not a
+  // secret from the house; adding and editing stays admin-only, enforced
+  // by the restrictive policies in 06-pin-login.sql, not by this list.
+  { href: 'members.html',    label: 'Members',    icon: 'users',          key: 'members',    roles: ['admin', 'sevak', 'viewer'] },
   { href: 'utilities.html',  label: 'Utility bills', icon: 'receipt',     key: 'utilities',  roles: ['admin'] },
   { href: 'settings.html',   label: 'Settings',   icon: 'settings',       key: 'settings',   roles: ['admin'] }
 ];
