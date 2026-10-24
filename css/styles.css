@@ -96,15 +96,25 @@
   background: var(--tblr-bg-surface);
   height: 100%;
   align-items: stretch;
+  justify-content: flex-start;
 }
+
+/* Bootstrap gives every `.navbar > .container-*` justify-content:
+   space-between, which is right for a horizontal bar and wrong for this
+   one: as soon as the aside is taller than its contents — which it always
+   is once the drawer fills the screen — it flings the brand to the top
+   and the links to the bottom with a hole in between. Everything stacks
+   from the top here; the spacer below takes up the slack instead. */
 .gm-sidebar > .container-fluid {
   flex-direction: column;
   align-items: stretch;
+  justify-content: flex-start;
   padding: 0.75rem 0;
   height: 100%;
   overflow-y: auto;
   flex-wrap: nowrap;
 }
+.gm-sidebar .navbar-nav { flex: none; }
 
 .gm-brand {
   display: flex; align-items: center; gap: 0.6rem;
