@@ -89,6 +89,46 @@ export function areaChart(el, { labels, values, total }) {
   return chart;
 }
 
+// One yuvak, sabha by sabha. Every column is one sabha, coloured by the
+// mark, so a run of absences is visible at a glance. The height carries
+// no meaning beyond "there was a sabha", so the y-axis stays hidden.
+export function memberChart(el, { labels, marks, notMarked = [] }) {
+  const opts = {
+    ...base(),
+    chart: { ...base().chart, type: 'bar', height: 260 },
+    series: [{ name: 'Mark', data: marks.map(() => 1) }],
+    colors: marks.map((s) => STATUS_COLOURS[s] ?? '#b9b5ad'),
+    plotOptions: {
+      bar: { columnWidth: marks.length > 24 ? '72%' : '46%', borderRadius: 4, distributed: true }
+    },
+    stroke: { width: 0 },
+    xaxis: {
+      categories: labels,
+      tooltip: { enabled: false },
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+      labels: { rotate: 0, hideOverlappingLabels: true }
+    },
+    yaxis: { show: false, min: 0, max: 1 },
+    tooltip: {
+      ...base().tooltip,
+      y: {
+        formatter: (_v, { dataPointIndex }) => {
+          const s = marks[dataPointIndex];
+          const label = s ? s[0].toUpperCase() + s.slice(1) : 'Not marked';
+          const note = notMarked[dataPointIndex];
+          return note ? `${label} — ${note}` : label;
+        },
+        title: { formatter: () => '' }
+      }
+    }
+  };
+
+  const chart = new ApexCharts(el, opts);
+  chart.render();
+  return chart;
+}
+
 // How the marks break down across every sabha in view.
 export function donutChart(el, counts) {
   const keys = Object.keys(counts).filter((k) => counts[k] > 0);

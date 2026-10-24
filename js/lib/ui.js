@@ -81,14 +81,12 @@ export function renderChrome(profile, active) {
   const initials = profile.name
     .split(' ').filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
 
+  // No Bootstrap collapse here. On a phone this is an off-canvas drawer
+  // that slides over the page; Tabler's own collapse pushes the content
+  // down instead, which is what made the mobile menu unusable.
   aside.innerHTML = `
-    <aside class="navbar navbar-vertical navbar-expand-lg gm-sidebar d-print-none">
+    <aside class="navbar navbar-vertical gm-sidebar d-print-none">
       <div class="container-fluid">
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-                data-bs-target="#sidebar-menu" aria-label="Toggle navigation">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-
         <div class="gm-brand">
           <span class="gm-mark">${MARK_SVG}</span>
           <span class="gm-wordmark">
@@ -98,29 +96,38 @@ export function renderChrome(profile, active) {
                   aria-label="Collapse the sidebar" aria-expanded="true">
             <i class="ti ti-chevron-left"></i>
           </button>
+          <button type="button" class="gm-navclose" id="nav-close" aria-label="Close the menu">
+            <i class="ti ti-x"></i>
+          </button>
         </div>
 
-        <div class="collapse navbar-collapse" id="sidebar-menu">
-          <div class="gm-sidebar__label d-none d-lg-block">Pages</div>
-          <ul class="navbar-nav pt-lg-1">
-            ${nav.map((n) => `
-              <li class="nav-item${n.key === active ? ' active' : ''}">
-                <a class="nav-link" href="${n.href}"${n.key === active ? ' aria-current="page"' : ''}>
-                  <span class="nav-link-icon"><i class="ti ti-${n.icon}"></i></span>
-                  <span class="nav-link-title">${n.label}</span>
-                </a>
-              </li>`).join('')}
-          </ul>
-        </div>
+        <div class="gm-sidebar__label">Pages</div>
+        <ul class="navbar-nav">
+          ${nav.map((n) => `
+            <li class="nav-item${n.key === active ? ' active' : ''}">
+              <a class="nav-link" href="${n.href}"${n.key === active ? ' aria-current="page"' : ''}>
+                <span class="nav-link-icon"><i class="ti ti-${n.icon}"></i></span>
+                <span class="nav-link-title">${n.label}</span>
+              </a>
+            </li>`).join('')}
+        </ul>
       </div>
     </aside>`;
 
   top.innerHTML = `
     <header class="navbar navbar-expand-md gm-topbar d-print-none">
       <div class="container-xl">
+        <button class="gm-hamburger" id="nav-toggle" aria-label="Open the menu"
+                aria-expanded="false" aria-controls="sidebar">
+          <i class="ti ti-menu-2"></i>
+        </button>
         <div class="gm-topbar__title">${esc(current?.label ?? '')}</div>
 
         <div class="navbar-nav flex-row order-md-last align-items-center ms-auto">
+          <button class="btn btn-ghost-secondary btn-icon me-1 d-none" id="pwa-install"
+                  aria-label="Install this app">
+            <i class="ti ti-download"></i>
+          </button>
           <button class="btn btn-ghost-secondary btn-icon me-1" id="theme-toggle"></button>
 
           <div class="nav-item dropdown">
@@ -149,6 +156,8 @@ export function renderChrome(profile, active) {
 
   paintThemeIcon();
   applyMini(readMini());
+  wireDrawer();
+  initInstall();
 
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
   document.getElementById('sidebar-collapse').addEventListener('click', () => {
@@ -160,6 +169,69 @@ export function renderChrome(profile, active) {
     signOut();
   });
 }
+
+/* ---------- mobile drawer ---------- */
+
+function setDrawer(open) {
+  document.body.classList.toggle('gm-nav-open', open);
+  document.getElementById('nav-toggle')?.setAttribute('aria-expanded', String(open));
+  // Stop the page scrolling behind the drawer.
+  document.body.style.overflow = open ? 'hidden' : '';
+}
+
+function wireDrawer() {
+  let backdrop = document.querySelector('.gm-backdrop');
+  if (!backdrop) {
+    backdrop = document.createElement('div');
+    backdrop.className = 'gm-backdrop';
+    document.body.appendChild(backdrop);
+  }
+
+  document.getElementById('nav-toggle')?.addEventListener('click', () => setDrawer(true));
+  document.getElementById('nav-close')?.addEventListener('click', () => setDrawer(false));
+  backdrop.addEventListener('click', () => setDrawer(false));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') setDrawer(false);
+  });
+
+  // Returning to a wide screen should never leave the drawer state stuck.
+  window.matchMedia('(min-width: 992px)').addEventListener('change', (e) => {
+    if (e.matches) setDrawer(false);
+  });
+}
+
+/* ---------- install prompt ---------- */
+
+let installEvent = null;
+
+function initInstall() {
+  const btn = document.getElementById('pwa-install');
+  if (!btn) return;
+
+  if (installEvent) btn.classList.remove('d-none');
+
+  btn.addEventListener('click', async () => {
+    if (!installEvent) return;
+    installEvent.prompt();
+    await installEvent.userChoice;
+    installEvent = null;
+    btn.classList.add('d-none');
+  });
+}
+
+// Chrome fires this before the chrome-provided install UI; holding onto it
+// lets the portal offer its own button instead.
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installEvent = e;
+  document.getElementById('pwa-install')?.classList.remove('d-none');
+});
+
+window.addEventListener('appinstalled', () => {
+  installEvent = null;
+  document.getElementById('pwa-install')?.classList.add('d-none');
+});
 
 /* ---------- mini sidebar ---------- */
 

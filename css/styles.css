@@ -175,6 +175,69 @@ body.gm-mini .gm-sidebar .nav-link {
 }
 body.gm-mini .gm-sidebar .nav-link-icon { font-size: 1.25rem; }
 
+/* ---------- mobile drawer ---------- */
+/* Below the breakpoint the sidebar slides over the page instead of
+   sitting in the flow and pushing everything down. */
+
+.gm-hamburger,
+.gm-navclose {
+  display: none;
+  border: 1px solid var(--tblr-border-color);
+  border-radius: 9px;
+  background: var(--tblr-bg-surface);
+  color: var(--tblr-body-color);
+  cursor: pointer;
+}
+.gm-hamburger { width: 38px; height: 38px; margin-right: 0.6rem; font-size: 1.15rem; }
+.gm-navclose { width: 30px; height: 30px; flex: none; font-size: 1rem; }
+
+.gm-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(16, 12, 8, 0.45);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 1035;
+}
+
+@media (max-width: 991.98px) {
+  .gm-hamburger, .gm-navclose { display: grid; place-items: center; }
+
+  /* The mini toggle is meaningless on a phone — the drawer is either
+     open or it is not. */
+  .gm-collapse { display: none; }
+
+  #sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(17rem, 84vw);
+    z-index: 1040;
+    transform: translateX(-102%);
+    transition: transform 0.24s ease;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.25);
+  }
+  #sidebar .navbar-vertical {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    inset: auto;
+    transform: none;
+  }
+  .page-wrapper { margin-left: 0; }
+
+  body.gm-nav-open #sidebar { transform: translateX(0); }
+  body.gm-nav-open .gm-backdrop { opacity: 1; pointer-events: auto; }
+
+  /* Mini mode is a desktop idea; never let it leak onto a phone. */
+  body.gm-mini .gm-wordmark,
+  body.gm-mini .gm-sidebar__label,
+  body.gm-mini .gm-sidebar .nav-link-title { display: revert; }
+  body.gm-mini .gm-brand { flex-direction: row; padding: 0.25rem 0.75rem 0.75rem; }
+  body.gm-mini .gm-sidebar .nav-link {
+    justify-content: flex-start; padding: 0.6rem 0.75rem; margin: 1px 0.5rem;
+  }
+}
+
 .gm-topbar {
   background: transparent;
   border: none;
@@ -203,6 +266,26 @@ body.gm-mini .gm-sidebar .nav-link-icon { font-size: 1.25rem; }
 }
 .gm-range button[aria-pressed='true'] {
   background: var(--tblr-primary); color: var(--tblr-primary-fg);
+}
+
+/* Month / yuvak pickers in a card header. They wrap under the title on a
+   narrow screen rather than squeezing the heading out. */
+.gm-filters { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.gm-filters__item { display: flex; align-items: center; gap: 0.4rem; margin: 0; }
+.gm-filters__item > span {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tblr-secondary);
+  white-space: nowrap;
+}
+.gm-filters__item select { min-width: 9rem; }
+
+@media (max-width: 575.98px) {
+  .card-header:has(.gm-filters) { display: block; }
+  .card-header:has(.gm-filters) .card-actions { margin: 0.75rem 0 0; }
+  .gm-filters__item { flex: 1 1 100%; }
+  .gm-filters__item select { min-width: 0; flex: 1; }
 }
 
 /* ---------- brand ---------- */

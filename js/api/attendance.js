@@ -77,7 +77,7 @@ export async function fullHistory(mandirId, limit = 2000) {
     await sb
       .from('attendance')
       .select(
-        'status, reason, members!inner(full_name, mandir_id), sabhas!inner(sabha_date, sabha_type, is_cancelled)'
+        'member_id, status, reason, members!inner(full_name, mandir_id), sabhas!inner(sabha_date, sabha_type, is_cancelled)'
       )
       .eq('members.mandir_id', mandirId)
       .eq('sabhas.is_cancelled', false)

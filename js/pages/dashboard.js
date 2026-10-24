@@ -12,7 +12,7 @@ import {
   attendanceTrend, fullHistory, historyForMember, currentStreak, missedStreak
 } from '../api/attendance.js';
 import { listAbsences } from '../api/utilities.js';
-import { areaChart, donutChart } from '../lib/charts.js';
+import { areaChart, donutChart, memberChart } from '../lib/charts.js';
 import { band, nextSabha } from '../lib/schedule.js';
 import { today, formatShort, formatLong, initials } from '../lib/dates.js';
 
@@ -108,18 +108,45 @@ function render() {
       </div>
     </div>`;
 
-  document.getElementById('pick')?.addEventListener('change', (e) => selectMember(e.target.value));
+  // The two yuvak pickers are one choice shown twice — picking a name in
+  // either the chart header or the insights panel moves both, so the page
+  // is never showing one person's chart beside another's numbers.
+  document.getElementById('pick')?.addEventListener('change', (e) => {
+    who = e.target.value;
+    const f = document.getElementById('f-who');
+    if (f) f.value = who;
+    retitle();
+    drawCharts();
+    selectMember(who);
+  });
 
-  main.querySelectorAll('[data-range]').forEach((b) =>
-    b.addEventListener('click', () => {
-      if (range === b.dataset.range) return;
-      range = b.dataset.range;
-      main.querySelectorAll('[data-range]').forEach((x) =>
-        x.setAttribute('aria-pressed', String(x.dataset.range === range)));
-      drawCharts();
-    }));
+  // The filters only change what the two charts draw, so retitle the
+  // cards in place rather than re-rendering the whole dashboard.
+  document.getElementById('f-month')?.addEventListener('change', (e) => {
+    month = e.target.value;
+    retitle();
+    drawCharts();
+  });
+
+  document.getElementById('f-who')?.addEventListener('change', (e) => {
+    who = e.target.value;
+    retitle();
+    drawCharts();
+    if (who !== 'all') {
+      const pick = document.getElementById('pick');
+      if (pick) pick.value = who;
+      selectMember(who);
+    }
+  });
 
   drawCharts();
+}
+
+function retitle() {
+  const t = document.getElementById('trend-title');
+  if (t) t.textContent = trendTitle();
+  const m = document.getElementById('mix-title');
+  if (m) m.textContent = mixTitle();
 }
 
 function statCard(label, value, icon, tone) {
@@ -198,30 +225,65 @@ function awayCard() {
   </div>`;
 }
 
-// How many sabhas the trend chart shows. Null means everything recorded.
-const RANGES = [
-  { key: '6',  label: '6' },
-  { key: '12', label: '12' },
-  { key: 'all', label: 'All' }
-];
-let range = '12';
+// Chart filters. 'all' months and 'all' yuvaks is the house-wide view.
+let month = 'all';
+let who = 'all';
+
+const monthKey = (iso) => iso.slice(0, 7);
+
+function monthName(key) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
+}
+
+// Every month that has a recorded sabha, newest first.
+function monthsWithSabhas() {
+  return [...new Set(trend.map((t) => monthKey(t.date)))].sort().reverse();
+}
 
 function visibleTrend() {
-  if (range === 'all') return trend;
-  return trend.slice(-Number(range));
+  return month === 'all' ? trend : trend.filter((t) => monthKey(t.date) === month);
+}
+
+function filterBar() {
+  const months = monthsWithSabhas();
+  return `<div class="gm-filters">
+    <label class="gm-filters__item">
+      <span>Month</span>
+      <select id="f-month" class="form-select form-select-sm">
+        <option value="all"${month === 'all' ? ' selected' : ''}>All months</option>
+        ${months.map((k) =>
+          `<option value="${k}"${month === k ? ' selected' : ''}>${esc(monthName(k))}</option>`
+        ).join('')}
+      </select>
+    </label>
+    <label class="gm-filters__item">
+      <span>Yuvak</span>
+      <select id="f-who" class="form-select form-select-sm">
+        <option value="all"${who === 'all' ? ' selected' : ''}>All yuvaks</option>
+        ${members.map((m) =>
+          `<option value="${m.id}"${who === m.id ? ' selected' : ''}>${esc(m.full_name)}</option>`
+        ).join('')}
+      </select>
+    </label>
+  </div>`;
+}
+
+const whoName = () => members.find((m) => m.id === who)?.full_name ?? '';
+
+function trendTitle() {
+  return who === 'all' ? 'Attendance by sabha' : `${whoName()} — sabha by sabha`;
+}
+
+function mixTitle() {
+  return who === 'all' ? 'How marks break down' : `${whoName()} — marks`;
 }
 
 function trendCard() {
   return `<div class="card mb-3">
     <div class="card-header">
-      <h3 class="card-title">Attendance by sabha</h3>
-      <div class="card-actions">
-        <div class="gm-range" role="group" aria-label="How many sabhas to show">
-          ${RANGES.map((r) => `
-            <button type="button" data-range="${r.key}"
-                    aria-pressed="${range === r.key}">${r.label}</button>`).join('')}
-        </div>
-      </div>
+      <h3 class="card-title" id="trend-title">${esc(trendTitle())}</h3>
+      <div class="card-actions">${filterBar()}</div>
     </div>
     <div class="card-body">
       <div id="trend-chart" class="gm-chart"></div>
@@ -241,6 +303,13 @@ function drawCharts() {
   trendChart = null;
   mixChart = null;
 
+  // ApexCharts appends into its container, so an empty-state message
+  // left behind would sit above the next chart. Clear both hosts first.
+  for (const id of ['trend-chart', 'mix-chart']) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  }
+
   // The library is a deferred CDN script. It should be ready by now, but
   // on a cold cache it may not be — try again once the page has loaded,
   // and give up quietly rather than throwing if the CDN is unreachable.
@@ -257,34 +326,63 @@ function drawCharts() {
 
   const rows = visibleTrend();
   const trendEl = document.getElementById('trend-chart');
-  if (trendEl && rows.length) {
+
+  if (trendEl && !rows.length) {
+    trendEl.innerHTML = noneHere();
+  } else if (trendEl && who === 'all') {
     trendChart = areaChart(trendEl, {
       labels: rows.map((t) => formatShort(t.date)),
       values: rows.map((t) => t.present),
       total: Math.max(...rows.map((t) => t.total), members.length, 1)
     });
+  } else if (trendEl) {
+    // One yuvak: a column per sabha in view, coloured by their mark.
+    // Sabhas with no row for them (away, or not living here yet) stay
+    // grey rather than being dropped, so the dates still line up.
+    const mine = new Map(
+      marks.filter((r) => r.member_id === who).map((r) => [r.sabhas.sabha_date, r])
+    );
+    trendChart = memberChart(trendEl, {
+      labels: rows.map((t) => formatShort(t.date)),
+      marks: rows.map((t) => mine.get(t.date)?.status ?? null),
+      notMarked: rows.map((t) => mine.get(t.date)?.reason ?? '')
+    });
   }
 
   const mixEl = document.getElementById('mix-chart');
   if (mixEl) {
-    const dates = new Set(rows.map((t) => t.date));
-    const counts = { present: 0, late: 0, excused: 0, absent: 0 };
-    for (const r of marks) {
-      if (dates.has(r.sabhas.sabha_date) && counts[r.status] !== undefined) {
-        counts[r.status] += 1;
-      }
-    }
+    const counts = visibleCounts(rows);
     if (Object.values(counts).some((n) => n > 0)) {
       mixChart = donutChart(mixEl, counts);
     } else {
-      mixEl.innerHTML = '<p class="text-secondary small text-center py-4 mb-0">Nothing marked yet.</p>';
+      mixEl.innerHTML = noneHere();
     }
   }
 }
 
+// Marks inside both filters — the months in view, and the chosen yuvak.
+function visibleCounts(rows) {
+  const dates = new Set(rows.map((t) => t.date));
+  const counts = { present: 0, late: 0, excused: 0, absent: 0 };
+  for (const r of marks) {
+    if (who !== 'all' && r.member_id !== who) continue;
+    if (dates.has(r.sabhas.sabha_date) && counts[r.status] !== undefined) {
+      counts[r.status] += 1;
+    }
+  }
+  return counts;
+}
+
+function noneHere() {
+  const where = month === 'all' ? '' : ` in ${esc(monthName(month))}`;
+  return `<p class="text-secondary small text-center py-5 mb-0">
+    Nothing marked${where}.
+  </p>`;
+}
+
 function mixCard() {
   return `<div class="card mb-3">
-    <div class="card-header"><h3 class="card-title">How marks break down</h3></div>
+    <div class="card-header"><h3 class="card-title" id="mix-title">${esc(mixTitle())}</h3></div>
     <div class="card-body">
       <div id="mix-chart"></div>
     </div>

@@ -49,12 +49,28 @@ async function init() {
   }
 }
 
-function render() {
-  const held = sabhas.filter((s) => !s.is_cancelled).slice(0, 15).reverse();
+// Which sabhas the grid shows. 'recent' is the default — the last 15,
+// which is as many columns as fit before the table starts scrolling.
+let gridMonth = 'recent';
+let map = new Map();
 
+const monthKey = (iso) => iso.slice(0, 7);
+
+function monthName(key) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
+}
+
+function heldSabhas() {
+  const live = sabhas.filter((s) => !s.is_cancelled);
+  if (gridMonth === 'recent') return live.slice(0, 15).reverse();
+  return live.filter((s) => monthKey(s.sabha_date) === gridMonth).reverse();
+}
+
+function render() {
   // Keyed by member and date so the grid can look up both the status and
   // whatever the sevak typed in the reason box.
-  const map = new Map();
+  map = new Map();
   for (const r of rows) {
     map.set(`${r.members.full_name}|${r.sabhas.sabha_date}`,
       { status: r.status, reason: r.reason });
@@ -67,24 +83,7 @@ function render() {
   main.innerHTML = `
     ${pageHeader('History', `${sabhas.length} sabhas recorded`, actions)}
 
-    <div class="card mb-3">
-      <div class="card-header">
-        <h3 class="card-title">Attendance grid</h3>
-        <div class="card-actions text-secondary small">last ${held.length} sabhas</div>
-      </div>
-      ${held.length
-        ? `<div class="table-responsive">${gridTable(held, map)}</div>
-           <div class="gm-note-bar" id="note-bar" hidden></div>
-           <div class="card-footer">
-             ${statusLegend({ inline: true })}
-             <div class="text-secondary small mt-2">
-               A dash means that sabha was not recorded. A cell with a dot in the
-               corner has a note — tap it to read.
-             </div>
-           </div>`
-        : `<div class="card-body">${emptyState('calendar-off', 'Nothing recorded yet',
-             'The grid fills in as you mark sabhas.')}</div>`}
-    </div>
+    <div class="card mb-3" id="grid-card">${gridCard()}</div>
 
     ${awayCard()}
 
@@ -114,6 +113,60 @@ function render() {
     if (!stats.length) return toast('Nothing to export yet', 'error');
     exportSummary(stats, `dasanudas-summary-${new Date().toISOString().slice(0, 10)}.csv`);
     toast('Downloaded', 'success');
+  });
+
+  wireGrid();
+}
+
+// The grid card redraws on its own when the month changes — the rest of
+// the page does not depend on the filter, so there is no need to rebuild it.
+function gridCard() {
+  const held = heldSabhas();
+  const months = [...new Set(
+    sabhas.filter((s) => !s.is_cancelled).map((s) => monthKey(s.sabha_date))
+  )].sort().reverse();
+
+  const picker = `<div class="gm-filters">
+    <label class="gm-filters__item">
+      <span>Month</span>
+      <select id="grid-month" class="form-select form-select-sm">
+        <option value="recent"${gridMonth === 'recent' ? ' selected' : ''}>Last 15 sabhas</option>
+        ${months.map((k) =>
+          `<option value="${k}"${gridMonth === k ? ' selected' : ''}>${esc(monthName(k))}</option>`
+        ).join('')}
+      </select>
+    </label>
+  </div>`;
+
+  return `<div class="card-header">
+      <h3 class="card-title">Attendance grid</h3>
+      <div class="card-actions">${picker}</div>
+    </div>
+    ${held.length
+      ? `<div class="table-responsive">${gridTable(held, map)}</div>
+         <div class="gm-note-bar" id="note-bar" hidden></div>
+         <div class="card-footer">
+           ${statusLegend({ inline: true })}
+           <div class="text-secondary small mt-2">
+             Showing ${held.length} ${held.length === 1 ? 'sabha' : 'sabhas'}.
+             A dash means that sabha was not recorded. A cell with a dot in the
+             corner has a note — tap it to read.
+           </div>
+         </div>`
+      : `<div class="card-body">${emptyState('calendar-off',
+           gridMonth === 'recent' ? 'Nothing recorded yet' : 'No sabhas that month',
+           gridMonth === 'recent'
+             ? 'The grid fills in as you mark sabhas.'
+             : 'Pick another month, or go back to the last 15 sabhas.')}</div>`}`;
+}
+
+function wireGrid() {
+  document.getElementById('grid-month')?.addEventListener('change', (e) => {
+    gridMonth = e.target.value;
+    const card = document.getElementById('grid-card');
+    if (!card) return;
+    card.innerHTML = gridCard();
+    wireGrid();
   });
 
   wireNotes();
