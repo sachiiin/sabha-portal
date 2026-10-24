@@ -24,6 +24,16 @@ create index if not exists idx_bill_exclusions_bill on bill_exclusions (bill_id)
 comment on table bill_exclusions is
   'A yuvak left out of one bill. His days come out of the split entirely; the rest cover the bill.';
 
+-- From 30 October 2026 Supabase no longer grants the Data API access to a
+-- new public table automatically, so the grant goes in the same migration
+-- that creates it. Without this the table is invisible to supabase-js and
+-- every call returns "permission denied". Row-level security below still
+-- decides who may actually read or write a row; this only opens the door.
+-- Nothing is granted to anon: a PIN session signs in anonymously but still
+-- carries the 'authenticated' role.
+grant select, insert, update, delete on public.bill_exclusions to authenticated;
+grant select, insert, update, delete on public.bill_exclusions to service_role;
+
 -- ---------- the split, with exclusions ----------
 --
 -- The return type gains a column, and Postgres will not let a function
