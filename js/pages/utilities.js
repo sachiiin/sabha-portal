@@ -6,7 +6,7 @@ import { requireAuth, isAdmin } from '../auth.js';
 import {
   renderChrome, applyTheme, pageHeader, esc, toast, showError, emptyState, spinner
 } from '../lib/ui.js';
-import { listMembers } from '../api/members.js';
+import { listMembers, isCurrent } from '../api/members.js';
 import {
   listBills, createBill, updateBill, deleteBill, billSplit,
   excludeFromBill, includeInBill, listExclusions,
@@ -14,7 +14,7 @@ import {
   listCharges, createCharge, deleteCharge, setTransferred
 } from '../api/utilities.js';
 import { getHouseSettings, setMonthlyRent } from '../api/settings.js';
-import { formatShort, formatLong, today, initials } from '../lib/dates.js';
+import { formatShort, fromISO, today, initials } from '../lib/dates.js';
 
 applyTheme();
 
@@ -60,9 +60,75 @@ async function load() {
   render();
 }
 
+// How the house opens a message. The same greeting the attendance share uses.
+const GREETING = 'Jay Swaminarayan Das na Das Banavshoji 🙏';
+
 function money(n) {
   return new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' })
     .format(Number(n));
+}
+
+// A date carrying its year — these messages go to someone who moved out
+// months ago, so "Sep 1" on its own invites the wrong question.
+function dated(iso) {
+  return fromISO(iso).toLocaleDateString('en-CA', {
+    day: 'numeric', month: 'short', year: 'numeric'
+  });
+}
+
+// The part of a bill's period this yuvak was actually living here. For
+// someone who moved out mid-period that is the stay he is being charged
+// for, and it is the line he will check first.
+function stayIn(member, bill) {
+  const from = member?.house_start && member.house_start > bill.period_start
+    ? member.house_start
+    : bill.period_start;
+  const to = member?.house_end && member.house_end < bill.period_end
+    ? member.house_end
+    : bill.period_end;
+
+  if (to < from) return null;         // no overlap at all
+  return { from, to, days: days(from, to) };
+}
+
+// Has he moved out? Those are the yuvaks who need the bill sent to them
+// rather than told at sabha, which is what the per-row copy is for.
+function movedOut(memberId) {
+  const m = members.find((x) => x.id === memberId);
+  return Boolean(m) && !isCurrent(m);
+}
+
+// One yuvak's share, written out ready to paste into a chat with him.
+function personalMessage(billId, memberId) {
+  const bill = bills.find((b) => b.id === billId);
+  const row = (splitCache.get(billId) ?? []).find((r) => r.member_id === memberId);
+  if (!bill || !row) return '';
+
+  const stay = stayIn(members.find((m) => m.id === memberId), bill);
+  const lines = [
+    GREETING,
+    '',
+    `*${row.full_name}*`,
+    bill.name,
+    `Service dates: ${dated(bill.period_start)} – ${dated(bill.period_end)}`
+  ];
+
+  if (stay) {
+    lines.push(
+      `In the house: ${dated(stay.from)} – ${dated(stay.to)}`
+      + ` (${stay.days} ${stay.days === 1 ? 'day' : 'days'})`
+    );
+  }
+
+  // Without this the arithmetic looks wrong to him: a 20-day stay charged
+  // for 14 days needs the six days away spelled out.
+  if (row.days_away) {
+    lines.push(`Days away: ${row.days_away} (not charged)`);
+    lines.push(`Days charged: ${row.days_present}`);
+  }
+
+  lines.push(`Amount: *${money(row.share)}*`);
+  return lines.join('\n');
 }
 
 function days(aISO, bISO) {
@@ -598,20 +664,33 @@ async function showSplit(billId) {
                       </button>
                     </td>
                   </tr>`
-                : `<tr>
-                    <td>${esc(r.full_name)}</td>
+                : `<tr${movedOut(r.member_id) ? ' class="gm-moved"' : ''}>
+                    <td>
+                      ${esc(r.full_name)}
+                      ${movedOut(r.member_id)
+                        ? '<span class="badge bg-orange-lt ms-1">moved out</span>'
+                        : ''}
+                    </td>
                     <td class="text-end">${r.days_present}</td>
                     <td class="text-end ${r.days_away ? 'text-watch' : 'text-secondary'}">
                       ${r.days_away || '—'}
                     </td>
                     <td class="text-end fw-medium">${esc(money(r.share))}</td>
                     <td class="text-end">
-                      <button type="button" class="btn btn-sm btn-icon btn-ghost-secondary"
-                              data-exclude="${r.member_id}" data-bill="${billId}"
-                              aria-label="Take ${esc(r.full_name)} off this bill"
-                              title="Take him off this bill">
-                        <i class="ti ti-user-minus"></i>
-                      </button>
+                      <div class="btn-list flex-nowrap justify-content-end">
+                        <button type="button" class="btn btn-sm btn-icon"
+                                data-copy-row="${r.member_id}" data-bill="${billId}"
+                                aria-label="Copy ${esc(r.full_name)}'s share as a message"
+                                title="Copy his share as a message">
+                          <i class="ti ti-message-2-share"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-icon btn-ghost-secondary"
+                                data-exclude="${r.member_id}" data-bill="${billId}"
+                                aria-label="Take ${esc(r.full_name)} off this bill"
+                                title="Take him off this bill">
+                          <i class="ti ti-user-minus"></i>
+                        </button>
+                      </div>
                     </td>
                   </tr>`).join('')}
             </tbody>
@@ -642,12 +721,32 @@ async function showSplit(billId) {
     host.querySelector('[data-copy]').addEventListener('click', () => copySplit(billId));
     host.querySelector('[data-csv]').addEventListener('click', () => csvSplit(billId));
 
+    host.querySelectorAll('[data-copy-row]').forEach((b) =>
+      b.addEventListener('click', () => copyRow(billId, b.dataset.copyRow)));
+
     host.querySelectorAll('[data-exclude]').forEach((b) =>
       b.addEventListener('click', () => onExclude(billId, b.dataset.exclude)));
     host.querySelectorAll('[data-include]').forEach((b) =>
       b.addEventListener('click', () => onInclude(billId, b.dataset.include)));
   } catch (e) {
     showError(host, e.message);
+  }
+}
+
+async function copyRow(billId, memberId) {
+  const text = personalMessage(billId, memberId);
+  if (!text) return toast('Nothing to copy yet', 'error');
+
+  const name = (splitCache.get(billId) ?? [])
+    .find((r) => r.member_id === memberId)?.full_name ?? 'his share';
+
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(`Copied — paste it to ${name}`, 'success');
+  } catch {
+    // Clipboard access needs a secure context and can be refused outright.
+    // Showing the text beats a dead end: he can select it and copy by hand.
+    prompt('Copy this and send it to him:', text);
   }
 }
 
@@ -708,7 +807,10 @@ function splitLines(billId) {
 async function copySplit(billId) {
   const { bill, rows, off } = splitLines(billId);
   const text = [
-    `${bill.name} — ${formatLong(bill.period_start)} to ${formatLong(bill.period_end)}`,
+    GREETING,
+    '',
+    `*${bill.name}*`,
+    `Service dates: ${dated(bill.period_start)} – ${dated(bill.period_end)}`,
     `Total ${money(bill.amount)}`,
     '',
     ...rows.map((r) => `${r.full_name}: ${money(r.share)}`

@@ -378,10 +378,16 @@ async function createHere() {
 // Builds the summary as plain text with WhatsApp's own formatting marks
 // (*bold*). Reads whatever is on screen right now, so a sevak can share
 // straight after marking without saving first.
+// How the house opens a message. Kept as one constant so the attendance
+// share and the utility bill messages always greet the same way.
+const GREETING = 'Jay Swaminarayan Das na Das Banavshoji 🙏';
+
 function shareText() {
   const label = { sunday: 'Sunday Sabha', thursday: 'Thursday Sabha', extra: 'Sabha' };
   const lines = [];
 
+  lines.push(GREETING);
+  lines.push('');
   lines.push(`*${label[sabha.sabha_type] ?? 'Sabha'}*`);
   lines.push(formatLong(dateISO));
   if (sabha.topic) lines.push(`Topic: ${sabha.topic}`);

@@ -498,3 +498,7 @@ body.gm-mini .gm-sidebar .nav-link-icon { font-size: 1.25rem; }
   outline: 2px solid var(--tblr-primary);
   outline-offset: -2px;
 }
+
+/* A yuvak on this bill who has since moved out — he needs the bill sent
+   to him rather than mentioned at sabha. */
+.gm-moved > td:first-child { font-weight: 500; }
