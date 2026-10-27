@@ -20,6 +20,7 @@ const SHELL = [
   './account.html',
   './platform-dashboard.html',
   './platform-houses.html',
+  './platform-house.html',
   './platform-approvals.html',
   './platform-team.html',
   './css/styles.css',

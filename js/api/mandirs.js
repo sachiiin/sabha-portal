@@ -39,3 +39,15 @@ export async function listMandirs(status) {
 export async function setMandirStatus(id, status) {
   return unwrap(await sb.rpc('set_mandir_status', { p_mandir: id, p_status: status }));
 }
+
+// One house, for platform-house.js's header — same columns as
+// listMandirs(), just narrowed to a single row by id.
+export async function getMandir(id) {
+  return unwrap(
+    await sb
+      .from('mandirs')
+      .select('id, name, ghar_name, address, contact_name, contact_email, status, created_at, reviewed_at')
+      .eq('id', id)
+      .single()
+  );
+}

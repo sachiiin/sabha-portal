@@ -112,11 +112,15 @@ function card(m) {
           ${m.contact_email ? ` &middot; <a href="mailto:${esc(m.contact_email)}">${esc(m.contact_email)}</a>` : ''}
         </div>` : ''}
       </div>
-      ${m.status === 'pending' ? `<div class="card-footer">
-        <a href="platform-approvals.html" class="btn btn-sm w-100">
-          <i class="ti ti-clipboard-check me-1"></i> Review in Approvals
-        </a>
-      </div>` : ''}
+      <div class="card-footer">
+        ${m.status === 'pending'
+          ? `<a href="platform-approvals.html" class="btn btn-sm w-100">
+               <i class="ti ti-clipboard-check me-1"></i> Review in Approvals
+             </a>`
+          : `<a href="platform-house.html?id=${m.id}" class="btn btn-sm w-100">
+               <i class="ti ti-eye me-1"></i> View
+             </a>`}
+      </div>
     </div>
   </div>`;
 }

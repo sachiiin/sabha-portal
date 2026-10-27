@@ -6,8 +6,9 @@ Supabase provides the database and authentication.
 One deployment serves any number of gharmandirs. Anyone can register theirs
 at `register.html`; a platform admin approves it from the separate platform
 admin area before it can be used. Every house's data is isolated from every
-other's by Postgres row-level security, not just by the UI — see
-"Multi-tenant model" below.
+other's by Postgres row-level security, not just by the UI — with one
+deliberate, read-only exception for the platform admin — see "Multi-tenant
+model" below.
 
 A platform admin account is its own world, not an extra tab bolted onto a
 regular gharmandir: signing in with one always lands in `platform-*.html`,
@@ -28,6 +29,7 @@ sabha-portal/
 │
 ├── platform-dashboard.html    Platform admin: houses/people at a glance
 ├── platform-houses.html       Platform admin: every house, card view
+├── platform-house.html        Platform admin: one house's dashboard/history/roster/users
 ├── platform-approvals.html    Platform admin: approve/reject registrations
 ├── platform-team.html         Platform admin: team + create/move users
 │
@@ -55,7 +57,7 @@ sabha-portal/
 │   └── pages/
 │       ├── dashboard.js, attendance.js, members.js, history.js
 │       ├── account.js
-│       └── platform-dashboard.js, platform-houses.js,
+│       └── platform-dashboard.js, platform-houses.js, platform-house.js,
 │           platform-approvals.js, platform-team.js
 │
 └── sql/                      Run these in the Supabase SQL editor, in order
@@ -66,7 +68,8 @@ sabha-portal/
     ├── ...
     ├── 12-multi-tenant.sql       registration, approval, platform admin
     ├── 13-pin-login-multi-tenant.sql
-    └── 14-platform-team.sql      create/move/promote accounts directly
+    ├── 14-platform-team.sql      create/move/promote accounts directly
+    └── 15-platform-house-view.sql  read-only: one house's dashboard/history/roster
 ```
 
 ## Setup
@@ -204,11 +207,18 @@ Registration (`sql/12-multi-tenant.sql`) layers two more things on top:
   independent check, in case the UI redirect in `auth.js` is ever
   bypassed) unable to read or write members/sabhas/attendance — until
   `set_mandir_status()` marks it `approved`.
-- The platform admin's visibility is equally narrow by design: the
-  platform pages show a mandir's name, address and registering admin's
-  contact details — enough to review a registration — never its members,
-  sabhas or attendance. Those stay exactly as isolated from the platform
-  admin as from every other gharmandir.
+- The platform admin's visibility was originally this narrow by design —
+  a mandir's name, address and registering admin's contact details, never
+  its members, sabhas or attendance — but `sql/15-platform-house-view.sql`
+  adds an explicit, read-only exception: opening a house from **All
+  Houses** shows its actual dashboard, sabha history and roster, plus who
+  has a login there. It's deliberately narrow in its own way: four new
+  SELECT-only policies, so nothing a platform admin does through this can
+  ever write to a house's data, only look at it. `js/api/members.js`,
+  `sabhas.js` and `attendance.js` all already took an explicit mandirId
+  argument rather than assuming the caller's own, so `platform-house.js`
+  reuses them completely unchanged — only the database side had to learn
+  to allow it.
 
 `sql/14-platform-team.sql` extends that same visibility to `app_users`
 itself, so **Team & Users** can list every account on the platform —
