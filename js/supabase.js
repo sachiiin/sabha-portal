@@ -18,3 +18,12 @@ export function unwrap({ data, error }) {
   if (error) throw new Error(error.message);
   return data;
 }
+
+// Where a confirmation or password-recovery email should send someone
+// back to. Supabase falls back to the project's dashboard "Site URL" —
+// which defaults to http://localhost:3000 and sends people nowhere useful
+// if that's never been changed — so every signUp() call passes this
+// explicitly instead of relying on that setting being right.
+export function loginRedirectUrl() {
+  return new URL('login.html', window.location.href).href;
+}

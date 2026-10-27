@@ -3,7 +3,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SUPABASE_URL, SUPABASE_KEY } from '../config.js';
-import { sb, unwrap } from '../supabase.js';
+import { sb, unwrap, loginRedirectUrl } from '../supabase.js';
 
 // Creates the Supabase Auth account itself, through a second, throwaway
 // client that is never persisted to storage. The ordinary signUp() on the
@@ -15,7 +15,10 @@ async function createAuthAccount(email, password) {
   const temp = createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false }
   });
-  const { data, error } = await temp.auth.signUp({ email, password });
+  const { data, error } = await temp.auth.signUp({
+    email, password,
+    options: { emailRedirectTo: loginRedirectUrl() }
+  });
   if (error) throw new Error(error.message);
   if (!data.user) throw new Error('Could not create that account.');
   return data.user.id;

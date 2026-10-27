@@ -15,7 +15,7 @@
 // happen until a session exists, which may be a later page load — see
 // stashPendingRegistration() below.
 
-import { sb, unwrap } from './supabase.js';
+import { sb, unwrap, loginRedirectUrl } from './supabase.js';
 import { registerMandir } from './api/mandirs.js';
 
 let cachedProfile = null;
@@ -53,7 +53,10 @@ export async function signIn(email, password) {
 // Returns a null session when the Supabase project requires email
 // confirmation — register.js stashes the mandir details for that case.
 export async function signUp(email, password) {
-  const { data, error } = await sb.auth.signUp({ email, password });
+  const { data, error } = await sb.auth.signUp({
+    email, password,
+    options: { emailRedirectTo: loginRedirectUrl() }
+  });
   if (error) throw new Error(error.message);
   cachedProfile = null;
   return data;
