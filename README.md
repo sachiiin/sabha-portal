@@ -27,7 +27,7 @@ sabha-portal/
 ├── members.html              Member roster (admin can edit)
 ├── history.html              Grid, sabha list, CSV export
 │
-├── platform-dashboard.html    Platform admin: houses/people at a glance
+├── platform-dashboard.html    Platform admin: PIN-viewer dashboard, all houses or one
 ├── platform-houses.html       Platform admin: every house, card view
 ├── platform-house.html        Platform admin: one house's dashboard/history/roster/users
 ├── platform-approvals.html    Platform admin: approve/reject registrations
@@ -224,6 +224,11 @@ Registration (`sql/12-multi-tenant.sql`) layers two more things on top:
   `js/lib/charts.js` and `export.js` are pure, profile-independent
   utilities already, so `platform-house.js` reuses all of it completely
   unchanged — only the database side had to learn to allow the reads.
+  The dashboard tab of that view was pulled out into
+  `js/lib/house-dashboard.js` so **Dashboard** itself can reuse it: by
+  default it fetches every approved house's scope, merges them into one
+  set of stats/charts/roster, and a House filter beside the page title
+  narrows that same view to a single house on demand.
 
 `sql/14-platform-team.sql` extends that same visibility to `app_users`
 itself, so **Team & Users** can list every account on the platform —
