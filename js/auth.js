@@ -90,7 +90,7 @@ export async function signInWithPin(gharName, pin) {
   if (data !== true) {
     // Leave no dangling anonymous session behind a wrong guess.
     await sb.auth.signOut();
-    throw new Error('That ghar name and PIN don’t match.');
+    throw new Error('That house name and PIN don’t match.');
   }
 
   cachedProfile = null;

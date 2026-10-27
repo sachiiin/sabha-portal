@@ -25,7 +25,7 @@
       <div class="d-inline-flex align-items-center gap-2 mb-2">
         <span class="gm-mark gm-mark--lg" id="brand-mark"></span>
       </div>
-      <div class="gm-wordmark">Sabha<small>Gharmandir attendance</small></div>
+      <div class="gm-wordmark">Etobicoke Sabha<small>Gharmandir attendance</small></div>
     </div>
 
     <div class="card card-md">
@@ -42,7 +42,7 @@
 
           <form id="pin-form" novalidate>
             <div class="mb-3">
-              <label class="form-label" for="ghar-name">Ghar name</label>
+              <label class="form-label" for="ghar-name">House name</label>
               <input type="text" id="ghar-name" class="form-control"
                      placeholder="e.g. Dasanudas" autocomplete="off" required>
             </div>
@@ -206,7 +206,7 @@ pinForm.addEventListener('submit', async (e) => {
 
   const gharName = gharNameInput.value.trim();
   const pin = pinInput.value.trim();
-  if (!gharName || !pin) return fail('Enter the ghar name and PIN.');
+  if (!gharName || !pin) return fail('Enter the house name and PIN.');
 
   pinSubmit.disabled = true;
   pinSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Checking';

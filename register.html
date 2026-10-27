@@ -21,7 +21,7 @@
       <div class="d-inline-flex align-items-center gap-2 mb-2">
         <span class="gm-mark gm-mark--lg" id="brand-mark"></span>
       </div>
-      <div class="gm-wordmark">Sabha<small>Gharmandir attendance, for any house</small></div>
+      <div class="gm-wordmark">Etobicoke Sabha<small>Gharmandir attendance, for any house</small></div>
     </div>
 
     <div class="card card-lg">
@@ -38,18 +38,11 @@
           </p>
 
           <form id="register-form" novalidate>
-            <div class="row">
-              <div class="col-12 col-sm-6 mb-3">
-                <label class="form-label" for="mandir-name">Gharmandir name</label>
-                <input type="text" id="mandir-name" class="form-control"
-                       placeholder="Gharmandir" autocomplete="organization" required>
-              </div>
-              <div class="col-12 col-sm-6 mb-3">
-                <label class="form-label" for="ghar-name">Ghar name</label>
-                <input type="text" id="ghar-name" class="form-control"
-                       placeholder="e.g. Dasanudas" required>
-                <small class="form-hint">What this house is called day to day.</small>
-              </div>
+            <div class="mb-3">
+              <label class="form-label" for="ghar-name">House name</label>
+              <input type="text" id="ghar-name" class="form-control"
+                     placeholder="e.g. Dasanudas" required>
+              <small class="form-hint">What this house is called day to day.</small>
             </div>
 
             <div class="mb-3">
@@ -181,7 +174,7 @@ form.addEventListener('submit', async (e) => {
   clearError();
 
   const fields = {
-    mandirName: document.getElementById('mandir-name').value.trim(),
+    mandirName: 'Gharmandir',
     gharName: document.getElementById('ghar-name').value.trim(),
     address: picked.address ?? (addressInput.value.trim() || null),
     lat: picked.lat,
@@ -205,7 +198,7 @@ form.addEventListener('submit', async (e) => {
       await registerMandir(fields);
       showDone(
         'Thanks — you’re on the list',
-        `${fields.mandirName} is waiting for a platform admin to approve it. Sign in any time to check on it.`
+        `${fields.gharName} is waiting for a platform admin to approve it. Sign in any time to check on it.`
       );
     } else {
       // Email confirmation is on for this project — finish registering
@@ -214,7 +207,7 @@ form.addEventListener('submit', async (e) => {
       stashPendingRegistration(fields);
       showDone(
         'Confirm your email',
-        `We've sent a confirmation link to ${fields.contactEmail}. Once you confirm it, sign in and we'll finish setting up ${fields.mandirName}.`
+        `We've sent a confirmation link to ${fields.contactEmail}. Once you confirm it, sign in and we'll finish setting up ${fields.gharName}.`
       );
     }
   } catch (ex) {
