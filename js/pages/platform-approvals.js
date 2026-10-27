@@ -6,12 +6,13 @@ import {
   renderPlatformChrome, applyTheme, pageHeader, esc, toast, showError, spinner, emptyState
 } from '../lib/ui.js';
 import { listMandirs, setMandirStatus } from '../api/mandirs.js';
+import { listAllUsers } from '../api/team.js';
 import { formatLong } from '../lib/dates.js';
 
 applyTheme();
 
 const main = document.getElementById('main');
-let profile, mandirs;
+let profile, mandirs, users;
 let tab = 'pending';
 
 init();
@@ -28,8 +29,78 @@ async function init() {
 
 async function load() {
   main.innerHTML = spinner;
-  mandirs = await listMandirs();
+  [mandirs, users] = await Promise.all([listMandirs(), listAllUsers()]);
   render();
+}
+
+function statCard(label, value, icon, tone = 'primary') {
+  return `<div class="col-6 col-lg-3">
+    <div class="card card-sm">
+      <div class="card-body">
+        <div class="row align-items-center g-2">
+          <div class="col-auto">
+            <span class="avatar bg-${tone}-lt"><i class="ti ti-${icon}"></i></span>
+          </div>
+          <div class="col">
+            <div class="text-secondary">${esc(label)}</div>
+            <div class="h3 mb-0 text-${tone}">${value}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function summary() {
+  const approved = mandirs.filter((m) => m.status === 'approved');
+  const pending = mandirs.filter((m) => m.status === 'pending');
+  const platformAdmins = users.filter((u) => u.platform_admin);
+  const houseUsers = users.filter((u) => !u.platform_admin);
+  const recent = [...mandirs].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 6);
+
+  return `
+    <div class="row row-deck row-cards mb-3">
+      ${statCard('Houses', mandirs.length, 'building-community')}
+      ${statCard('Needs review', pending.length, 'clock-hour-4', pending.length ? 'orange' : 'secondary')}
+      ${statCard('Approved', approved.length, 'circle-check', 'success')}
+      ${statCard('People', users.length, 'users')}
+    </div>
+    <div class="row row-cards mb-3">
+      <div class="col-12 col-lg-7">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Recently registered</h3></div>
+          ${recent.length
+            ? `<div class="list-group list-group-flush">${recent.map(recentRow).join('')}</div>`
+            : `<div class="card-body">${emptyState('building-community', 'Nothing here', 'No gharmandirs registered yet.')}</div>`}
+        </div>
+      </div>
+      <div class="col-12 col-lg-5">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Team</h3></div>
+          <div class="card-body">
+            <div class="text-secondary small text-uppercase">Platform admins</div>
+            <div class="h3">${platformAdmins.length}</div>
+            <div class="text-secondary small text-uppercase mt-3">Sevaks &amp; house admins</div>
+            <div class="h3">${houseUsers.length}</div>
+          </div>
+          <div class="card-footer">
+            <a href="platform-team.html" class="btn w-100"><i class="ti ti-users-group me-1"></i> Manage team &amp; users</a>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function recentRow(m) {
+  return `<div class="list-group-item">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="fw-medium">${esc(m.ghar_name)}</span>
+      <span class="badge ${STATUS_BADGE[m.status]}">${esc(m.status)}</span>
+    </div>
+    <div class="text-secondary small mt-1">
+      Registered ${esc(formatLong(m.created_at.slice(0, 10)))}
+    </div>
+  </div>`;
 }
 
 const STATUS_BADGE = {
@@ -63,6 +134,7 @@ function render() {
 
   main.innerHTML = `
     ${pageHeader('Approvals', 'Review a new gharmandir before it can be used.')}
+    ${summary()}
     ${tabsBar()}
     <div class="card">
       ${rows.length
