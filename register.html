@@ -40,18 +40,34 @@
           <form id="register-form" novalidate>
             <div class="mb-3">
               <label class="form-label" for="ghar-name">House name</label>
-              <input type="text" id="ghar-name" class="form-control"
-                     placeholder="e.g. Dasanudas" required>
+              <input type="text" id="ghar-name" class="form-control text-uppercase"
+                     placeholder="e.g. DASANUDAS" required>
               <small class="form-hint">What this house is called day to day.</small>
             </div>
 
             <div class="mb-3">
-              <label class="form-label" for="address">Address</label>
-              <input type="text" id="address" class="form-control"
-                     placeholder="Start typing an address&hellip;" autocomplete="off">
-              <small class="form-hint" id="address-hint">
-                Pick a suggestion so the address is saved precisely.
-              </small>
+              <label class="form-label" for="address-line">Address</label>
+              <input type="text" id="address-line" class="form-control"
+                     placeholder="e.g. 18 Tamarisk Dr" autocomplete="off" required>
+            </div>
+            <div class="row">
+              <div class="col-12 col-sm-6 mb-3">
+                <label class="form-label" for="province">Province</label>
+                <select id="province" class="form-select" required></select>
+              </div>
+              <div class="col-12 col-sm-6 mb-3">
+                <label class="form-label" for="city">City</label>
+                <select id="city" class="form-select" required disabled>
+                  <option value="" disabled selected>Choose a province first</option>
+                </select>
+                <input type="text" id="city-other" class="form-control mt-2"
+                       placeholder="City name" hidden>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="postal-code">Postal code</label>
+              <input type="text" id="postal-code" class="form-control text-uppercase"
+                     placeholder="A1A 1A1" maxlength="7" autocomplete="off" required>
             </div>
 
             <div class="hr-text">Your sign-in</div>
@@ -122,7 +138,9 @@
 import { signUp, stashPendingRegistration, stashPendingJoin } from './js/auth.js';
 import { registerMandir, findRegisteredMandir, joinMandir } from './js/api/mandirs.js';
 import { applyTheme, MARK_SVG } from './js/lib/ui.js';
-import { GOOGLE_MAPS_KEY } from './js/config.js';
+import {
+  provinceOptionsHTML, syncCityOptions, OTHER_CITY, formatPostalCode, isValidPostalCode
+} from './js/lib/geo.js';
 
 applyTheme();
 document.getElementById('brand-mark').innerHTML = MARK_SVG;
@@ -133,7 +151,12 @@ const paneJoinConfirm = document.getElementById('pane-join-confirm');
 const paneDone = document.getElementById('pane-done');
 const form = document.getElementById('register-form');
 const submitBtn = document.getElementById('register-submit');
-const addressInput = document.getElementById('address');
+const gharNameInput = document.getElementById('ghar-name');
+const addressLineInput = document.getElementById('address-line');
+const provinceSelect = document.getElementById('province');
+const citySelect = document.getElementById('city');
+const cityOtherInput = document.getElementById('city-other');
+const postalInput = document.getElementById('postal-code');
 
 function resetSubmitBtn() {
   submitBtn.disabled = false;
@@ -162,39 +185,38 @@ function showDone(title, body) {
   document.getElementById('done-body').textContent = body;
 }
 
-// ---------- address autocomplete (optional) ----------
-//
-// Degrades to a plain text field with no key configured, or if Google's
-// script fails to load — the address is still saved as free text either
-// way, just without lat/lng.
+// ---------- house name, province/city, postal code ----------
 
-let picked = { address: null, lat: null, lng: null };
+gharNameInput.addEventListener('input', () => {
+  const pos = gharNameInput.selectionStart;
+  gharNameInput.value = gharNameInput.value.toUpperCase();
+  gharNameInput.selectionStart = gharNameInput.selectionEnd = pos;
+});
 
-addressInput.addEventListener('input', () => { picked = { address: null, lat: null, lng: null }; });
+provinceSelect.innerHTML = provinceOptionsHTML();
 
-if (GOOGLE_MAPS_KEY) {
-  const hint = document.getElementById('address-hint');
-  window.__gmAutocompleteReady = () => {
-    const ac = new google.maps.places.Autocomplete(addressInput, { types: ['address'] });
-    ac.addListener('place_changed', () => {
-      const place = ac.getPlace();
-      const loc = place.geometry?.location;
-      picked = {
-        address: place.formatted_address ?? addressInput.value,
-        lat: loc ? loc.lat() : null,
-        lng: loc ? loc.lng() : null
-      };
-    });
-  };
-  const script = document.createElement('script');
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_MAPS_KEY)}`
-    + `&libraries=places&callback=__gmAutocompleteReady&loading=async`;
-  script.async = true;
-  script.onerror = () => { hint.textContent = 'Address suggestions are unavailable right now — you can still type it in.'; };
-  document.head.appendChild(script);
-} else {
-  document.getElementById('address-hint').textContent = '';
+provinceSelect.addEventListener('change', () => {
+  syncCityOptions(citySelect, provinceSelect.value);
+  cityOtherInput.hidden = true;
+  cityOtherInput.value = '';
+});
+
+citySelect.addEventListener('change', () => {
+  cityOtherInput.hidden = citySelect.value !== OTHER_CITY;
+  if (!cityOtherInput.hidden) cityOtherInput.focus();
+});
+
+function cityValue() {
+  return citySelect.value === OTHER_CITY ? cityOtherInput.value.trim() : citySelect.value;
 }
+
+postalInput.addEventListener('input', () => {
+  const before = postalInput.value.length;
+  const pos = postalInput.selectionStart;
+  postalInput.value = formatPostalCode(postalInput.value);
+  const grew = postalInput.value.length - before;
+  postalInput.selectionStart = postalInput.selectionEnd = Math.max(0, pos + grew);
+});
 
 // ---------- submit ----------
 
@@ -247,24 +269,29 @@ form.addEventListener('submit', async (e) => {
 
   const fields = {
     mandirName: 'Gharmandir',
-    gharName: document.getElementById('ghar-name').value.trim(),
-    address: picked.address ?? (addressInput.value.trim() || null),
-    lat: picked.lat,
-    lng: picked.lng,
+    gharName: gharNameInput.value.trim().toUpperCase(),
+    addressLine: addressLineInput.value.trim(),
+    city: cityValue(),
+    province: provinceSelect.value,
+    postalCode: formatPostalCode(postalInput.value),
     adminName: document.getElementById('admin-name').value.trim(),
     contactEmail: document.getElementById('email').value.trim()
   };
   const password = document.getElementById('password').value;
 
-  if (!fields.gharName || !fields.adminName || !fields.contactEmail || !password) {
+  if (!fields.gharName || !fields.addressLine || !fields.province || !fields.city
+      || !fields.adminName || !fields.contactEmail || !password) {
     return fail('Fill in every field above.');
+  }
+  if (!isValidPostalCode(fields.postalCode)) {
+    return fail('Enter a valid postal code, e.g. A1A 1A1.');
   }
 
   submitBtn.disabled = true;
   submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Setting up';
 
   try {
-    const match = await findRegisteredMandir(fields.gharName, fields.address);
+    const match = await findRegisteredMandir(fields.gharName, fields);
     if (match) {
       pendingFields = fields;
       pendingPassword = password;

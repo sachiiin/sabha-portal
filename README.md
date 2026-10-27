@@ -52,6 +52,7 @@ sabha-portal/
 │   │   ├── dates.js          Timezone-safe date handling
 │   │   ├── schedule.js       Sunday weekly, Thursday biweekly
 │   │   ├── export.js         CSV building and download
+│   │   ├── geo.js            Canada provinces/cities, postal code formatting
 │   │   └── ui.js             Header, nav (two variants), toasts, escaping
 │   │
 │   └── pages/
@@ -72,7 +73,8 @@ sabha-portal/
     ├── 15-platform-house-view.sql  read-only: one house's dashboard/history/roster
     ├── 16-platform-house-view-absences.sql  same, for the Away sections
     ├── 17-mandal-options.sql      this house's mandal categories
-    └── 18-house-join-requests.sql join an existing house instead of registering a new one
+    ├── 18-house-join-requests.sql join an existing house instead of registering a new one
+    └── 19-structured-address.sql  street/city/province/postal code instead of free text + Places
 ```
 
 ## Setup
@@ -104,9 +106,6 @@ Edit `js/config.js`:
   Or read the project ref out of the dashboard address bar
   (`https://supabase.com/dashboard/project/<REF>`) and use `https://<REF>.supabase.co`.
 - **SUPABASE_KEY** — **Settings → API Keys → Publishable key** (`sb_publishable_...`).
-- **GOOGLE_MAPS_KEY** — optional. Powers the address autocomplete on
-  `register.html`. Get one from the Google Cloud Console with the *Places
-  API* enabled; leave it blank and that field is just a plain text box.
 
 Never put the secret key in this file. It bypasses row-level security, and
 anything in `js/` is downloadable by anyone who opens the page.

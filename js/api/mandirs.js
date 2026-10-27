@@ -5,17 +5,18 @@ import { sb, unwrap } from '../supabase.js';
 // Called from register.html, right after the new admin's account is
 // created. Runs as register_mandir() in Postgres, which also creates the
 // settings row and links the caller as that mandir's first admin — see
-// sql/12-multi-tenant.sql.
+// sql/12-multi-tenant.sql and sql/19-structured-address.sql.
 export async function registerMandir({
-  mandirName, gharName, address, lat, lng, adminName, contactEmail
+  mandirName, gharName, addressLine, city, province, postalCode, adminName, contactEmail
 }) {
   return unwrap(
     await sb.rpc('register_mandir', {
       p_mandir_name: mandirName,
       p_ghar_name: gharName,
-      p_address: address ?? null,
-      p_lat: lat ?? null,
-      p_lng: lng ?? null,
+      p_address_line: addressLine ?? null,
+      p_city: city ?? null,
+      p_province: province ?? null,
+      p_postal_code: postalCode ?? null,
       p_admin_name: adminName,
       p_contact_email: contactEmail ?? null
     })
@@ -26,11 +27,31 @@ export async function registerMandir({
 // address, so a second person from a house that already registered gets
 // offered "join this house" instead of silently creating a duplicate
 // mandir. Returns null when nothing matches.
-export async function findRegisteredMandir(gharName, address) {
+export async function findRegisteredMandir(gharName, { addressLine, city, province, postalCode }) {
   const rows = await unwrap(
-    await sb.rpc('find_registered_mandir', { p_ghar_name: gharName, p_address: address ?? null })
+    await sb.rpc('find_registered_mandir', {
+      p_ghar_name: gharName,
+      p_address_line: addressLine ?? null,
+      p_city: city ?? null,
+      p_province: province ?? null,
+      p_postal_code: postalCode ?? null
+    })
   );
   return rows?.[0] ?? null;
+}
+
+// Called from settings.html by a house's own admin — the one way
+// anyone but the platform admin can change a mandir row at all, and
+// narrowly scoped to just these four columns.
+export async function updateMandirAddress({ addressLine, city, province, postalCode }) {
+  return unwrap(
+    await sb.rpc('update_mandir_address', {
+      p_address_line: addressLine ?? null,
+      p_city: city ?? null,
+      p_province: province ?? null,
+      p_postal_code: postalCode ?? null
+    })
+  );
 }
 
 // Called right after signUp(), mirroring registerMandir() above but
@@ -47,7 +68,7 @@ export async function joinMandir(mandirId, fullName) {
 export async function listMandirs(status) {
   let query = sb
     .from('mandirs')
-    .select('id, name, ghar_name, address, contact_name, contact_email, status, created_at, reviewed_at')
+    .select('id, name, ghar_name, address, address_line, city, province, postal_code, contact_name, contact_email, status, created_at, reviewed_at')
     .order('created_at', { ascending: false });
 
   if (status) query = query.eq('status', status);
@@ -65,7 +86,7 @@ export async function getMandir(id) {
   return unwrap(
     await sb
       .from('mandirs')
-      .select('id, name, ghar_name, address, contact_name, contact_email, status, created_at, reviewed_at')
+      .select('id, name, ghar_name, address, address_line, city, province, postal_code, contact_name, contact_email, status, created_at, reviewed_at')
       .eq('id', id)
       .single()
   );

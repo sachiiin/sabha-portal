@@ -7,12 +7,16 @@ import {
 import {
   getHouseSettings, setHousePin, clearHousePin, revokePinSessions, countPinSessions
 } from '../api/settings.js';
+import { getMandir, updateMandirAddress } from '../api/mandirs.js';
 import { formatLong } from '../lib/dates.js';
+import {
+  provinceOptionsHTML, syncCityOptions, OTHER_CITY, formatPostalCode, isValidPostalCode
+} from '../lib/geo.js';
 
 applyTheme();
 
 const main = document.getElementById('main');
-let profile, settings, sessions;
+let profile, settings, sessions, mandir;
 
 init();
 
@@ -34,9 +38,10 @@ async function init() {
 
 async function load() {
   main.innerHTML = spinner;
-  [settings, sessions] = await Promise.all([
+  [settings, sessions, mandir] = await Promise.all([
     getHouseSettings(profile.mandirId),
-    countPinSessions(profile.mandirId)
+    countPinSessions(profile.mandirId),
+    getMandir(profile.mandirId)
   ]);
   render();
 }
@@ -116,7 +121,7 @@ function render() {
           </div>
         </div>
 
-        <div class="card">
+        <div class="card mb-3">
           <div class="card-header"><h3 class="card-title">Sabha schedule</h3></div>
           <div class="card-body">
             <div class="datagrid">
@@ -137,6 +142,8 @@ function render() {
             </p>
           </div>
         </div>
+
+        ${addressCard()}
 
       </div>
 
@@ -166,6 +173,102 @@ function render() {
   document.getElementById('pin-form').addEventListener('submit', onSetPin);
   document.getElementById('clear')?.addEventListener('click', onClear);
   document.getElementById('revoke')?.addEventListener('click', onRevoke);
+
+  wireAddressForm();
+}
+
+function addressCard() {
+  return `<div class="card">
+    <div class="card-header"><h3 class="card-title">Address</h3></div>
+    <div class="card-body">
+      <form id="address-form" novalidate>
+        <div class="mb-3">
+          <label class="form-label" for="address-line">Address</label>
+          <input type="text" id="address-line" class="form-control" value="${esc(mandir.address_line ?? '')}"
+                 placeholder="e.g. 18 Tamarisk Dr" autocomplete="off">
+        </div>
+        <div class="row">
+          <div class="col-12 col-sm-6 mb-3">
+            <label class="form-label" for="province">Province</label>
+            <select id="province" class="form-select">${provinceOptionsHTML(mandir.province ?? '')}</select>
+          </div>
+          <div class="col-12 col-sm-6 mb-3">
+            <label class="form-label" for="city">City</label>
+            <select id="city" class="form-select"></select>
+            <input type="text" id="city-other" class="form-control mt-2" value="${esc(mandir.city ?? '')}"
+                   placeholder="City name" hidden>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="postal-code">Postal code</label>
+          <input type="text" id="postal-code" class="form-control text-uppercase"
+                 value="${esc(mandir.postal_code ?? '')}" placeholder="A1A 1A1" maxlength="7" autocomplete="off">
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <i class="ti ti-map-pin me-1"></i> Save address
+        </button>
+      </form>
+    </div>
+  </div>`;
+}
+
+function wireAddressForm() {
+  const provinceSelect = document.getElementById('province');
+  const citySelect = document.getElementById('city');
+  const cityOtherInput = document.getElementById('city-other');
+  const postalInput = document.getElementById('postal-code');
+
+  syncCityOptions(citySelect, mandir.province ?? '', mandir.city ?? '');
+  cityOtherInput.hidden = citySelect.value !== OTHER_CITY;
+
+  provinceSelect.addEventListener('change', () => {
+    syncCityOptions(citySelect, provinceSelect.value);
+    cityOtherInput.hidden = true;
+    cityOtherInput.value = '';
+  });
+
+  citySelect.addEventListener('change', () => {
+    cityOtherInput.hidden = citySelect.value !== OTHER_CITY;
+    if (!cityOtherInput.hidden) cityOtherInput.focus();
+  });
+
+  postalInput.addEventListener('input', () => {
+    const before = postalInput.value.length;
+    const pos = postalInput.selectionStart;
+    postalInput.value = formatPostalCode(postalInput.value);
+    const grew = postalInput.value.length - before;
+    postalInput.selectionStart = postalInput.selectionEnd = Math.max(0, pos + grew);
+  });
+
+  document.getElementById('address-form').addEventListener('submit', onSaveAddress);
+}
+
+function cityValue() {
+  const citySelect = document.getElementById('city');
+  const cityOtherInput = document.getElementById('city-other');
+  return citySelect.value === OTHER_CITY ? cityOtherInput.value.trim() : citySelect.value;
+}
+
+async function onSaveAddress(ev) {
+  ev.preventDefault();
+
+  const postalCode = formatPostalCode(document.getElementById('postal-code').value);
+  if (postalCode && !isValidPostalCode(postalCode)) {
+    return toast('Enter a valid postal code, e.g. A1A 1A1.', 'error');
+  }
+
+  try {
+    await updateMandirAddress({
+      addressLine: document.getElementById('address-line').value.trim() || null,
+      city: cityValue() || null,
+      province: document.getElementById('province').value || null,
+      postalCode: postalCode || null
+    });
+    toast('Address saved', 'success');
+    await load();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
 }
 
 async function onSetPin(ev) {

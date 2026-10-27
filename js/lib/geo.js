@@ -73,3 +73,33 @@ export function formatAddress({ addressLine, city, province, postalCode }) {
     .filter(Boolean);
   return parts.join(', ');
 }
+
+// Shared markup for register.html and the settings page's address
+// editor, so the province list and the "known city, or Other" logic
+// exist in exactly one place.
+
+export function provinceOptionsHTML(selected = '') {
+  return `<option value="" disabled${selected ? '' : ' selected'}>Choose a province</option>`
+    + PROVINCES.map((p) =>
+      `<option value="${p.code}"${p.code === selected ? ' selected' : ''}>${p.name}</option>`
+    ).join('');
+}
+
+export function cityOptionsHTML(provinceCode, selectedCity = '') {
+  const cities = CITIES_BY_PROVINCE[provinceCode] ?? [];
+  const known = cities.includes(selectedCity);
+  return `<option value="" disabled${selectedCity ? '' : ' selected'}>Choose a city</option>`
+    + cities.map((c) =>
+      `<option value="${c}"${c === selectedCity ? ' selected' : ''}>${c}</option>`
+    ).join('')
+    + `<option value="${OTHER_CITY}"${selectedCity && !known ? ' selected' : ''}>Other&hellip;</option>`;
+}
+
+// Re-populates a <select> of cities for a newly chosen province, keeping
+// selectedCity if it's one of that province's listed cities.
+export function syncCityOptions(citySelect, provinceCode, selectedCity = '') {
+  citySelect.disabled = !provinceCode;
+  citySelect.innerHTML = provinceCode
+    ? cityOptionsHTML(provinceCode, selectedCity)
+    : '<option value="" disabled selected>Choose a province first</option>';
+}
