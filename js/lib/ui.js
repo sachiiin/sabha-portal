@@ -278,6 +278,12 @@ export function pageHeader(title, subtitle, actions = '') {
   </div>`;
 }
 
+/* ---------- sharing ---------- */
+
+// How the house opens a message. Kept as one constant so the attendance
+// share and the utility bill messages always greet the same way.
+export const GREETING = 'Jay Swaminarayan Das na Das Banavshoji 🙏';
+
 /* ---------- attendance status ---------- */
 
 // One definition of P/L/E/A, used by every page so the letters, colours

@@ -47,6 +47,15 @@ export function dayOfWeek(iso) {
   return fromISO(iso).getDay(); // 0 = Sunday, 4 = Thursday
 }
 
+export function monthKey(iso) {
+  return iso.slice(0, 7);
+}
+
+export function monthName(key) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
+}
+
 export function initials(name) {
   return name
     .split(' ')

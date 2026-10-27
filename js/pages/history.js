@@ -10,7 +10,7 @@ import { listSabhas } from '../api/sabhas.js';
 import { fullHistory } from '../api/attendance.js';
 import { listAbsences } from '../api/utilities.js';
 import { exportAttendance, exportSummary } from '../lib/export.js';
-import { formatShort, formatLong, initials, today } from '../lib/dates.js';
+import { formatShort, formatLong, initials, today, monthKey, monthName } from '../lib/dates.js';
 import { band } from '../lib/schedule.js';
 
 applyTheme();
@@ -53,13 +53,6 @@ async function init() {
 // which is as many columns as fit before the table starts scrolling.
 let gridMonth = 'recent';
 let map = new Map();
-
-const monthKey = (iso) => iso.slice(0, 7);
-
-function monthName(key) {
-  const [y, m] = key.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
-}
 
 function heldSabhas() {
   const live = sabhas.filter((s) => !s.is_cancelled);

@@ -2,7 +2,7 @@
 
 import { requireAuth } from '../auth.js';
 import {
-  renderChrome, applyTheme, pageHeader, esc, toast, showError, spinner, statusLegend
+  renderChrome, applyTheme, pageHeader, esc, toast, showError, spinner, statusLegend, GREETING
 } from '../lib/ui.js';
 import { listMembers, livedHereOn } from '../api/members.js';
 import { getSettings, getSabhaByDate, getOrCreateSabha, updateSabha } from '../api/sabhas.js';
@@ -378,10 +378,6 @@ async function createHere() {
 // Builds the summary as plain text with WhatsApp's own formatting marks
 // (*bold*). Reads whatever is on screen right now, so a sevak can share
 // straight after marking without saving first.
-// How the house opens a message. Kept as one constant so the attendance
-// share and the utility bill messages always greet the same way.
-const GREETING = 'Jay Swaminarayan Das na Das Banavshoji 🙏';
-
 function shareText() {
   const label = { sunday: 'Sunday Sabha', thursday: 'Thursday Sabha', extra: 'Sabha' };
   const lines = [];

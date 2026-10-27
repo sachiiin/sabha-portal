@@ -72,19 +72,6 @@ export function previousSabha(fromISODate, anchorISO) {
   return null;
 }
 
-// Every scheduled sabha date in a range, oldest first.
-// Used to spot sabhas that were never recorded.
-export function sabhaDatesBetween(startISO, endISO, anchorISO) {
-  const out = [];
-  let cursor = startISO;
-  let guard = 0;
-  while (cursor <= endISO && guard++ < 1000) {
-    if (isSabhaDay(cursor, anchorISO)) out.push(cursor);
-    cursor = addDays(cursor, 1);
-  }
-  return out;
-}
-
 // Attendance thresholds used for colour coding across the app.
 export function band(pct) {
   if (pct >= 85) return 'good';

@@ -4,7 +4,7 @@
 
 import { requireAuth, isAdmin } from '../auth.js';
 import {
-  renderChrome, applyTheme, pageHeader, esc, toast, showError, emptyState, spinner
+  renderChrome, applyTheme, pageHeader, esc, toast, showError, emptyState, spinner, GREETING
 } from '../lib/ui.js';
 import { listMembers, isCurrent } from '../api/members.js';
 import {
@@ -59,9 +59,6 @@ async function load() {
   ]);
   render();
 }
-
-// How the house opens a message. The same greeting the attendance share uses.
-const GREETING = 'Jay Swaminarayan Das na Das Banavshoji 🙏';
 
 function money(n) {
   return new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' })

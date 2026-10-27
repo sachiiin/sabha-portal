@@ -14,7 +14,7 @@ import {
 import { listAbsences } from '../api/utilities.js';
 import { areaChart, donutChart, memberChart } from '../lib/charts.js';
 import { band, nextSabha } from '../lib/schedule.js';
-import { today, formatShort, formatLong, initials } from '../lib/dates.js';
+import { today, formatShort, formatLong, initials, monthKey, monthName } from '../lib/dates.js';
 
 applyTheme();
 
@@ -228,13 +228,6 @@ function awayCard() {
 // Chart filters. 'all' months and 'all' yuvaks is the house-wide view.
 let month = 'all';
 let who = 'all';
-
-const monthKey = (iso) => iso.slice(0, 7);
-
-function monthName(key) {
-  const [y, m] = key.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
-}
 
 // Every month that has a recorded sabha, newest first.
 function monthsWithSabhas() {
