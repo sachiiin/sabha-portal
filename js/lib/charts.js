@@ -1,13 +1,13 @@
 // ApexCharts helpers. Kept here so every chart in the portal shares one
 // set of defaults and reads the same colours as the rest of the theme.
 
-const BRAND = { light: '#c8651a', dark: '#e8944a' };
+const BRAND = { light: '#4c1d95', dark: '#a78bfa' };
 
 export const STATUS_COLOURS = {
-  present: '#2f855a',
-  late:    '#c8651a',
-  excused: '#2b6cb0',
-  absent:  '#c53030'
+  present: '#059669',
+  late:    '#f59e0b',
+  excused: '#2563eb',
+  absent:  '#e11d48'
 };
 
 function isDark() {
