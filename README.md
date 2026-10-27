@@ -4,57 +4,69 @@ Plain HTML, CSS and JavaScript. No build step, no framework, no npm install.
 Supabase provides the database and authentication.
 
 One deployment serves any number of gharmandirs. Anyone can register theirs
-at `register.html`; a platform admin approves it from `admin.html` before it
-can be used. Every house's data is isolated from every other's by Postgres
-row-level security, not just by the UI — see "Multi-tenant model" below.
+at `register.html`; a platform admin approves it from the separate platform
+admin area before it can be used. Every house's data is isolated from every
+other's by Postgres row-level security, not just by the UI — see
+"Multi-tenant model" below.
+
+A platform admin account is its own world, not an extra tab bolted onto a
+regular gharmandir: signing in with one always lands in `platform-*.html`,
+never a mandir's own dashboard, and a mandir's own sidebar never shows any
+sign the role exists. See "Become the platform admin" below to set yours up.
 
 ## What's here
 
 ```
 sabha-portal/
-├── index.html            Dashboard (landing page)
-├── login.html            Sign in — sevak/admin, or a house's shared PIN
-├── register.html         Public signup: register a new gharmandir
-├── admin.html            Platform admin only: approve/reject registrations
-├── attendance.html       Mark attendance for a sabha
-├── members.html          Member roster (admin can edit)
-├── history.html          Grid, sabha list, CSV export
+├── index.html                Dashboard (landing page)
+├── login.html                Sign in — sevak/admin, or a house's shared PIN
+├── register.html             Public signup: register a new gharmandir
+├── account.html              Change your own password
+├── attendance.html           Mark attendance for a sabha
+├── members.html              Member roster (admin can edit)
+├── history.html              Grid, sabha list, CSV export
 │
-├── css/styles.css        All styling, light + dark mode
+├── platform-dashboard.html    Platform admin: houses/people at a glance
+├── platform-houses.html       Platform admin: every house, card view
+├── platform-approvals.html    Platform admin: approve/reject registrations
+├── platform-team.html         Platform admin: team + create/move users
+│
+├── css/styles.css            All styling, light + dark mode
 │
 ├── js/
-│   ├── config.example.js Copy to config.js and fill in
-│   ├── config.js         YOUR KEYS — gitignored, you create this
-│   ├── supabase.js       Shared client
-│   ├── auth.js           Sign in/out, session guard, profile, approval gate
+│   ├── config.example.js     Copy to config.js and fill in
+│   ├── config.js             YOUR KEYS — gitignored, you create this
+│   ├── supabase.js           Shared client
+│   ├── auth.js               Sign in/out, session guard, profile, approval gate
 │   │
 │   ├── api/
-│   │   ├── members.js    Member CRUD + stats view
-│   │   ├── sabhas.js     Sabha records, settings
-│   │   ├── attendance.js Marking, history, trends
-│   │   └── mandirs.js    Registration, platform admin's house list
+│   │   ├── members.js        Member CRUD + stats view
+│   │   ├── sabhas.js         Sabha records, settings
+│   │   ├── attendance.js     Marking, history, trends
+│   │   ├── mandirs.js        Registration, platform admin's house list
+│   │   └── team.js           Platform admin: create/move/promote accounts
 │   │
 │   ├── lib/
-│   │   ├── dates.js      Timezone-safe date handling
-│   │   ├── schedule.js   Sunday weekly, Thursday biweekly
-│   │   ├── export.js     CSV building and download
-│   │   └── ui.js         Header, nav, toasts, escaping
+│   │   ├── dates.js          Timezone-safe date handling
+│   │   ├── schedule.js       Sunday weekly, Thursday biweekly
+│   │   ├── export.js         CSV building and download
+│   │   └── ui.js             Header, nav (two variants), toasts, escaping
 │   │
 │   └── pages/
-│       ├── dashboard.js
-│       ├── attendance.js
-│       ├── members.js
-│       ├── history.js
-│       └── admin-portal.js
+│       ├── dashboard.js, attendance.js, members.js, history.js
+│       ├── account.js
+│       └── platform-dashboard.js, platform-houses.js,
+│           platform-approvals.js, platform-team.js
 │
-└── sql/                  Run these in the Supabase SQL editor, in order
+└── sql/                      Run these in the Supabase SQL editor, in order
     ├── 01-schema.sql
     ├── 02-view.sql
-    ├── 03-seed.sql           optional — one example gharmandir with demo data
+    ├── 03-seed.sql               optional — one example gharmandir with demo data
     ├── 04-rls.sql
     ├── ...
-    ├── 12-multi-tenant.sql   registration, approval, platform admin
-    └── 13-pin-login-multi-tenant.sql
+    ├── 12-multi-tenant.sql       registration, approval, platform admin
+    ├── 13-pin-login-multi-tenant.sql
+    └── 14-platform-team.sql      create/move/promote accounts directly
 ```
 
 ## Setup
@@ -109,9 +121,20 @@ where id = (select mandir_id from app_users
             where id = (select id from auth.users where email = 'you@example.com'));
 ```
 
-Sign in again and an **All Houses** link appears in the sidebar — every
-gharmandir anyone registers from here on shows up there, pending your
-approval, and this first query is the only one you'll ever run by hand.
+Sign in again and you'll land in the platform admin area instead of the
+regular dashboard — every gharmandir anyone registers from here on shows up
+in **Approvals**, pending your decision, and this first query is the only
+one you'll ever run by hand. From **Team & Users** you can add more
+platform admins, or create a sevak/admin login for any house directly
+without waiting for that house to register one itself.
+
+One thing worth knowing about that query: the Dasanudas account it just
+flipped to `platform_admin = true` now always lands in the platform area,
+never the Dasanudas dashboard, even though it still technically has a
+`mandir_id`. If you also want to keep using that email for Dasanudas
+day-to-day, create a second account for platform work instead — through
+**Team & Users** once you're in, or by registering again with a different
+email the same way you just did.
 
 ### 5. Run it
 
@@ -134,6 +157,10 @@ form's details in `sessionStorage` and finishes registering automatically
 the next time that browser has a signed-in session with no mandir attached
 yet, which in practice is right after confirming and signing in.
 
+Accounts created from **Team & Users** work the same way: if *Confirm
+email* is on, that person needs to click the link in their confirmation
+email before the password the platform admin set for them will work.
+
 ## How the schedule works
 
 Sunday sabha is every week. Thursday sabha is every second week, counted
@@ -154,10 +181,12 @@ update settings set thursday_anchor = '2026-10-08';
 
 Enforced in Postgres by row-level security, not just in the UI.
 
-`platform_admin` is separate from all of this — it isn't a role, and it
-isn't scoped to a mandir_id like everything else here is. It's the one
-flag that lets its holder see every gharmandir's registration from
-`admin.html` and approve or reject it; see "Multi-tenant model" below.
+`platform_admin` is separate from all of this — it isn't a role, and an
+account with it set has no `mandir_id` or `role` at all (both are null
+together, or set together; `sql/14-platform-team.sql` adds that
+constraint). It's the one flag that lets its holder sign into the
+platform admin area instead of a mandir's own; see "Multi-tenant model"
+below.
 
 ## Multi-tenant model
 
@@ -175,11 +204,23 @@ Registration (`sql/12-multi-tenant.sql`) layers two more things on top:
   independent check, in case the UI redirect in `auth.js` is ever
   bypassed) unable to read or write members/sabhas/attendance — until
   `set_mandir_status()` marks it `approved`.
-- The platform admin's visibility is equally narrow by design: `admin.html`
-  shows a mandir's name, address and registering admin's contact details —
-  enough to review a registration — never its members, sabhas or
-  attendance. Those stay exactly as isolated from the platform admin as
-  from every other gharmandir.
+- The platform admin's visibility is equally narrow by design: the
+  platform pages show a mandir's name, address and registering admin's
+  contact details — enough to review a registration — never its members,
+  sabhas or attendance. Those stay exactly as isolated from the platform
+  admin as from every other gharmandir.
+
+`sql/14-platform-team.sql` extends that same visibility to `app_users`
+itself, so **Team & Users** can list every account on the platform —
+again, who they are and which house, never that house's actual data.
+Creating one there can't use the Supabase admin API — that needs the
+secret key, and this is a static site that never ships it to a browser —
+so `js/api/team.js` opens a second, unpersisted Supabase client that calls
+plain `signUp()` in the background and is then discarded, and a
+security-definer function links the account it created to a house and
+role. Moving someone between houses, or promoting/demoting a fellow
+platform admin, are both separate functions with the same `is_platform_admin()`
+check.
 
 One consequence worth knowing: the house PIN now needs the ghar name
 alongside it (`sql/13-pin-login-multi-tenant.sql`), since `claim_viewer()`

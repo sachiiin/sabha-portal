@@ -54,11 +54,18 @@ const NAV = [
   // by the restrictive policies in 06-pin-login.sql, not by this list.
   { href: 'members.html',    label: 'Members',    icon: 'users',          key: 'members',    roles: ['admin', 'sevak', 'viewer'] },
   { href: 'utilities.html',  label: 'Utility bills', icon: 'receipt',     key: 'utilities',  roles: ['admin'] },
-  { href: 'settings.html',   label: 'Settings',   icon: 'settings',       key: 'settings',   roles: ['admin'] },
-  // Not a role — every mandir has its own admin. This is the one person
-  // (or few) reviewing every mandir's registration, so it is filtered on
-  // profile.platformAdmin below rather than added to any role's list.
-  { href: 'admin.html',      label: 'All Houses', icon: 'building-community', key: 'admin', roles: [], platformOnly: true }
+  { href: 'settings.html',   label: 'Settings',   icon: 'settings',       key: 'settings',   roles: ['admin'] }
+];
+
+// The platform admin's own area is a separate shell entirely (see
+// renderPlatformChrome) — requireAuth() sends a platform-admin account
+// there and never renders this sidebar for them at all, so a mandir's own
+// people never see a hint that a platform admin exists.
+const PLATFORM_NAV = [
+  { href: 'platform-dashboard.html', label: 'Dashboard',    icon: 'chart-pie',          key: 'dashboard' },
+  { href: 'platform-houses.html',    label: 'All Houses',   icon: 'building-community', key: 'houses' },
+  { href: 'platform-approvals.html', label: 'Approvals',    icon: 'clipboard-check',    key: 'approvals' },
+  { href: 'platform-team.html',      label: 'Team & Users', icon: 'users-group',        key: 'team' }
 ];
 
 const ROLE_LABEL = { admin: 'Admin', sevak: 'Sevak', viewer: 'PIN access' };
@@ -81,7 +88,7 @@ export function renderChrome(profile, active) {
   const top = document.getElementById('topbar');
   if (!aside || !top) return;
 
-  const nav = NAV.filter((n) => n.roles.includes(profile.role) || (n.platformOnly && profile.platformAdmin));
+  const nav = NAV.filter((n) => n.roles.includes(profile.role));
   const roleLabel = ROLE_LABEL[profile.role] ?? profile.role;
   const current = nav.find((n) => n.key === active);
 
@@ -156,6 +163,10 @@ export function renderChrome(profile, active) {
               <span class="dropdown-item-text small text-secondary pb-2">
                 ${esc(profile.gharName)} &middot; ${esc(roleLabel)}
               </span>
+              ${profile.role === 'viewer' ? '' : `
+                <a href="account.html" class="dropdown-item">
+                  <i class="ti ti-lock me-2"></i> Change password
+                </a>`}
               <div class="dropdown-divider"></div>
               <a href="#" class="dropdown-item" id="signout">
                 <i class="ti ti-logout me-2"></i> Sign out
@@ -166,13 +177,20 @@ export function renderChrome(profile, active) {
       </div>
     </header>`;
 
+  wireChrome();
+}
+
+// Shared by renderChrome() and renderPlatformChrome() — everything that
+// isn't the brand block, nav list or account text, which differ between a
+// mandir's own chrome and the platform admin's.
+function wireChrome() {
   paintThemeIcon();
   applyMini(readMini());
   wireDrawer();
   initInstall();
 
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-  document.getElementById('sidebar-collapse').addEventListener('click', () => {
+  document.getElementById('sidebar-collapse')?.addEventListener('click', () => {
     applyMini(!readMini(), true);
   });
   document.getElementById('signout').addEventListener('click', async (e) => {
@@ -180,6 +198,90 @@ export function renderChrome(profile, active) {
     const { signOut } = await import('../auth.js');
     signOut();
   });
+}
+
+// The platform admin's own area: every gharmandir's registration, never
+// any mandir's members/sabhas/attendance. Deliberately NOT renderChrome()
+// with a flag bolted on — a platform admin never sees a regular mandir's
+// sidebar, and a mandir's own people never see a hint this role exists.
+export function renderPlatformChrome(profile, active) {
+  const aside = document.getElementById('sidebar');
+  const top = document.getElementById('topbar');
+  if (!aside || !top) return;
+
+  const current = PLATFORM_NAV.find((n) => n.key === active);
+  if (current) document.title = `${current.label} · Platform admin`;
+
+  const initials = profile.name
+    .split(' ').filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+
+  aside.innerHTML = `
+    <aside class="navbar navbar-vertical gm-sidebar d-print-none">
+      <div class="container-fluid">
+        <div class="gm-brand">
+          <span class="gm-mark">${MARK_SVG}</span>
+          <span class="gm-wordmark">Sabha<small>Platform admin</small></span>
+          <button type="button" class="gm-collapse" id="sidebar-collapse"
+                  aria-label="Collapse the sidebar" aria-expanded="true">
+            <i class="ti ti-chevron-left"></i>
+          </button>
+          <button type="button" class="gm-navclose" id="nav-close" aria-label="Close the menu">
+            <i class="ti ti-x"></i>
+          </button>
+        </div>
+
+        <div class="gm-sidebar__label">Platform</div>
+        <ul class="navbar-nav">
+          ${PLATFORM_NAV.map((n) => `
+            <li class="nav-item${n.key === active ? ' active' : ''}">
+              <a class="nav-link" href="${n.href}"${n.key === active ? ' aria-current="page"' : ''}>
+                <span class="nav-link-icon"><i class="ti ti-${n.icon}"></i></span>
+                <span class="nav-link-title">${n.label}</span>
+              </a>
+            </li>`).join('')}
+        </ul>
+      </div>
+    </aside>`;
+
+  top.innerHTML = `
+    <header class="navbar navbar-expand-md gm-topbar d-print-none">
+      <div class="container-xl">
+        <button class="gm-hamburger" id="nav-toggle" aria-label="Open the menu"
+                aria-expanded="false" aria-controls="sidebar">
+          <i class="ti ti-menu-2"></i>
+        </button>
+        <div class="gm-topbar__title">${esc(current?.label ?? '')}</div>
+
+        <div class="navbar-nav flex-row order-md-last align-items-center ms-auto">
+          <button class="btn btn-ghost-secondary btn-icon me-1" id="theme-toggle"></button>
+
+          <div class="nav-item dropdown">
+            <a href="#" class="nav-link d-flex lh-1 p-0 px-2" data-bs-toggle="dropdown"
+               aria-label="Open account menu" aria-expanded="false">
+              <span class="avatar avatar-sm bg-primary-lt">${esc(initials)}</span>
+              <div class="d-none d-xl-block ps-2">
+                <div>${esc(profile.name)}</div>
+                <div class="mt-1 small text-secondary">Platform admin</div>
+              </div>
+            </a>
+            <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+              <span class="dropdown-header">${esc(profile.name)}</span>
+              <span class="dropdown-item-text small text-secondary pb-2">Platform admin</span>
+              <div class="dropdown-divider"></div>
+              <a href="account.html" class="dropdown-item">
+                <i class="ti ti-lock me-2"></i> Change password
+              </a>
+              <div class="dropdown-divider"></div>
+              <a href="#" class="dropdown-item" id="signout">
+                <i class="ti ti-logout me-2"></i> Sign out
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>`;
+
+  wireChrome();
 }
 
 /* ---------- mobile drawer ---------- */

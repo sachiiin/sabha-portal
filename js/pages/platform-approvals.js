@@ -1,9 +1,9 @@
-// All Houses — platform admin only. Reviews every gharmandir's
+// Approvals — platform admin only. Reviews every gharmandir's
 // registration and approves or rejects it.
 
-import { requireAuth, isPlatformAdmin } from '../auth.js';
+import { requirePlatformAdmin } from '../auth.js';
 import {
-  renderChrome, applyTheme, pageHeader, esc, toast, showError, spinner, emptyState
+  renderPlatformChrome, applyTheme, pageHeader, esc, toast, showError, spinner, emptyState
 } from '../lib/ui.js';
 import { listMandirs, setMandirStatus } from '../api/mandirs.js';
 import { formatLong } from '../lib/dates.js';
@@ -18,14 +18,8 @@ init();
 
 async function init() {
   try {
-    profile = await requireAuth();
-
-    if (!isPlatformAdmin(profile)) {
-      location.href = 'index.html?e=forbidden';
-      return;
-    }
-
-    renderChrome(profile, 'admin');
+    profile = await requirePlatformAdmin();
+    renderPlatformChrome(profile, 'approvals');
     await load();
   } catch (e) {
     showError(main, e.message);
@@ -68,7 +62,7 @@ function render() {
   const rows = visible();
 
   main.innerHTML = `
-    ${pageHeader('All Houses', 'Every gharmandir registered on this platform.')}
+    ${pageHeader('Approvals', 'Review a new gharmandir before it can be used.')}
     ${tabsBar()}
     <div class="card">
       ${rows.length

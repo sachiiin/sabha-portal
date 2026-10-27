@@ -167,6 +167,15 @@ export async function requireAuth({ write = false } = {}) {
     throw new Error('no app_users row for this account');
   }
 
+  // The platform admin's area is a separate shell entirely (see
+  // renderPlatformChrome in ui.js) — a platform admin account never sees
+  // a mandir's own dashboard, roster or anything else, even if it also
+  // happens to carry a mandir_id from before it had this flag.
+  if (profile.platformAdmin) {
+    window.location.href = 'platform-dashboard.html';
+    throw new Error('platform admin — use the platform dashboard instead');
+  }
+
   // A brand-new mandir from register_mandir() starts 'pending', and stays
   // unusable until the platform admin approves it — this is the UI side
   // of that gate; 12-multi-tenant.sql's restrictive policies are the one
@@ -182,6 +191,33 @@ export async function requireAuth({ write = false } = {}) {
   }
 
   return profile;
+}
+
+// The platform admin pages' own guard, in place of requireAuth() — a
+// platform admin has no mandir to redirect "write" or approval checks
+// against, so it doesn't share requireAuth()'s logic, just its shape.
+export async function requirePlatformAdmin() {
+  const session = await getSession();
+  if (!session) {
+    window.location.href = 'login.html';
+    throw new Error('not authenticated');
+  }
+
+  const profile = await getProfile();
+  if (!profile?.platformAdmin) {
+    window.location.href = 'index.html?e=forbidden';
+    throw new Error('not a platform admin');
+  }
+
+  return profile;
+}
+
+// Used from account.html by anyone signed in — sevak, admin, platform
+// admin, or a fellow platform admin's freshly created account setting
+// their first real password.
+export async function changePassword(newPassword) {
+  const { error } = await sb.auth.updateUser({ password: newPassword });
+  if (error) throw new Error(error.message);
 }
 
 export function isAdmin(profile) {
