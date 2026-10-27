@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Sabha">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Sign in &middot; Dasanudas</title>
+<title>Sign in &middot; Sabha</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/css/tabler.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
 <link rel="stylesheet" href="css/styles.css">
@@ -25,7 +25,7 @@
       <div class="d-inline-flex align-items-center gap-2 mb-2">
         <span class="gm-mark gm-mark--lg" id="brand-mark"></span>
       </div>
-      <div class="gm-wordmark">Dasanudas<small>Gharmandir &middot; Sabha attendance</small></div>
+      <div class="gm-wordmark">Sabha<small>Gharmandir attendance</small></div>
     </div>
 
     <div class="card card-md">
@@ -41,6 +41,11 @@
           </p>
 
           <form id="pin-form" novalidate>
+            <div class="mb-3">
+              <label class="form-label" for="ghar-name">Ghar name</label>
+              <input type="text" id="ghar-name" class="form-control"
+                     placeholder="e.g. Dasanudas" autocomplete="off" required>
+            </div>
             <div class="mb-3">
               <label class="form-label" for="pin">House PIN</label>
               <input type="password" id="pin" class="form-control form-control-lg text-center gm-pin"
@@ -87,18 +92,33 @@
           </button>
         </div>
 
+        <!-- Pending / rejected registration -->
+        <div id="pane-status" hidden>
+          <div class="text-center">
+            <span class="avatar avatar-lg mb-3" id="status-icon"></span>
+            <h2 class="h4 mb-2" id="status-title"></h2>
+            <p class="text-secondary" id="status-body"></p>
+            <button class="btn w-100 mt-2" id="status-signout">
+              <i class="ti ti-logout me-1"></i> Sign out
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
 
-    <p class="text-secondary text-center mt-3 mb-0 small">
+    <p class="text-secondary text-center mt-3 mb-0 small" id="help-pin">
       Ask a house sevak for the PIN.
+    </p>
+    <p class="text-secondary text-center mt-2 mb-0 small">
+      New gharmandir? <a href="register.html">Register it</a>.
     </p>
 
   </div>
 </div>
 
 <script type="module">
-import { signIn, signInWithPin } from './js/auth.js';
+import { signIn, signInWithPin, signOut } from './js/auth.js';
 import { sb } from './js/supabase.js';
 import { applyTheme, MARK_SVG } from './js/lib/ui.js';
 
@@ -108,6 +128,8 @@ document.getElementById('brand-mark').innerHTML = MARK_SVG;
 const err = document.getElementById('err');
 const panePin = document.getElementById('pane-pin');
 const paneAdmin = document.getElementById('pane-admin');
+const paneStatus = document.getElementById('pane-status');
+const helpPin = document.getElementById('help-pin');
 
 function fail(msg) {
   err.textContent = msg;
@@ -119,44 +141,78 @@ function clearError() {
 
 function show(which) {
   clearError();
-  const pin = which === 'pin';
-  panePin.hidden = !pin;
-  paneAdmin.hidden = pin;
-  (pin ? document.getElementById('pin') : document.getElementById('email')).focus();
+  panePin.hidden = which !== 'pin';
+  paneAdmin.hidden = which !== 'admin';
+  paneStatus.hidden = which !== 'status';
+  helpPin.hidden = which === 'status';
+  if (which === 'pin') document.getElementById('ghar-name').focus();
+  if (which === 'admin') document.getElementById('email').focus();
 }
 
 document.getElementById('to-admin').addEventListener('click', () => show('admin'));
 document.getElementById('to-pin').addEventListener('click', () => show('pin'));
 
-if (new URLSearchParams(location.search).get('e') === 'nolink') {
+const STATUS_COPY = {
+  pending: {
+    icon: 'clock-hour-4',
+    tone: 'bg-orange-lt',
+    title: 'Still waiting for approval',
+    body: 'A platform admin hasn’t reviewed your gharmandir yet. Check back soon — there’s nothing more to do here in the meantime.'
+  },
+  rejected: {
+    icon: 'alert-triangle',
+    tone: 'bg-danger-lt',
+    title: 'Registration not approved',
+    body: 'This gharmandir’s registration was not approved. Contact the platform admin if you think that’s a mistake.'
+  }
+};
+
+const statusCode = new URLSearchParams(location.search).get('e');
+
+if (statusCode === 'pending' || statusCode === 'rejected') {
+  const copy = STATUS_COPY[statusCode];
+  document.getElementById('status-icon').className = `avatar avatar-lg mb-3 ${copy.tone}`;
+  document.getElementById('status-icon').innerHTML = `<i class="ti ti-${copy.icon} fs-1"></i>`;
+  document.getElementById('status-title').textContent = copy.title;
+  document.getElementById('status-body').textContent = copy.body;
+  show('status');
+} else if (statusCode === 'nolink') {
   fail('That account is not linked to a mandir yet.');
   show('admin');
 }
 
+document.getElementById('status-signout').addEventListener('click', () => signOut());
+
 sb.auth.getSession().then(({ data }) => {
-  if (data.session) location.href = 'index.html';
+  // A pending/rejected redirect here came FROM index.html's own session
+  // check — following an active session straight back there would loop.
+  if (data.session && statusCode !== 'pending' && statusCode !== 'rejected') {
+    location.href = 'index.html';
+  }
 });
 
 // --- PIN ---
 
 const pinForm = document.getElementById('pin-form');
+const gharNameInput = document.getElementById('ghar-name');
 const pinInput = document.getElementById('pin');
 const pinSubmit = document.getElementById('pin-submit');
 
-pinInput.addEventListener('input', clearError);
+pinForm.addEventListener('input', clearError);
 
 pinForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   clearError();
 
+  const gharName = gharNameInput.value.trim();
   const pin = pinInput.value.trim();
-  if (!pin) return fail('Enter the house PIN.');
+  if (!gharName || !pin) return fail('Enter the ghar name and PIN.');
 
   pinSubmit.disabled = true;
   pinSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Checking';
 
   try {
-    await signInWithPin(pin);
+    await signInWithPin(gharName, pin);
     location.href = 'index.html';
   } catch (ex) {
     fail(ex.message);

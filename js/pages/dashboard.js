@@ -32,8 +32,12 @@ async function init() {
     profile = await requireAuth();
     renderChrome(profile, 'dashboard');
 
-    if (new URLSearchParams(location.search).get('e') === 'readonly') {
+    const e = new URLSearchParams(location.search).get('e');
+    if (e === 'readonly') {
       toast('That page needs a sevak sign-in. PIN access is view-only.', 'info');
+      history.replaceState(null, '', 'index.html');
+    } else if (e === 'forbidden') {
+      toast('That page is for the platform admin only.', 'info');
       history.replaceState(null, '', 'index.html');
     }
 

@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#0b1130" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1130" media="(prefers-color-scheme: dark)">
+<title>Register your gharmandir &middot; Sabha</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/css/tabler.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="d-flex flex-column">
+
+<div class="gm-login-shell">
+  <div class="container container-tight">
+
+    <div class="text-center mb-4">
+      <div class="d-inline-flex align-items-center gap-2 mb-2">
+        <span class="gm-mark gm-mark--lg" id="brand-mark"></span>
+      </div>
+      <div class="gm-wordmark">Sabha<small>Gharmandir attendance, for any house</small></div>
+    </div>
+
+    <div class="card card-lg">
+      <div class="card-body">
+
+        <div class="alert alert-danger d-none py-2 px-3" id="err" role="alert"></div>
+
+        <!-- Registration form -->
+        <div id="pane-form">
+          <h2 class="h4 text-center mb-1">Set up your gharmandir</h2>
+          <p class="text-secondary text-center mb-4 small">
+            A platform admin reviews every new gharmandir before it goes live.
+            You'll be able to sign in and check on it any time.
+          </p>
+
+          <form id="register-form" novalidate>
+            <div class="row">
+              <div class="col-12 col-sm-6 mb-3">
+                <label class="form-label" for="mandir-name">Gharmandir name</label>
+                <input type="text" id="mandir-name" class="form-control"
+                       placeholder="Gharmandir" autocomplete="organization" required>
+              </div>
+              <div class="col-12 col-sm-6 mb-3">
+                <label class="form-label" for="ghar-name">Ghar name</label>
+                <input type="text" id="ghar-name" class="form-control"
+                       placeholder="e.g. Dasanudas" required>
+                <small class="form-hint">What this house is called day to day.</small>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label" for="address">Address</label>
+              <input type="text" id="address" class="form-control"
+                     placeholder="Start typing an address&hellip;" autocomplete="off">
+              <small class="form-hint" id="address-hint">
+                Pick a suggestion so the address is saved precisely.
+              </small>
+            </div>
+
+            <div class="hr-text">Your sign-in</div>
+
+            <div class="mb-3">
+              <label class="form-label" for="admin-name">Your name</label>
+              <input type="text" id="admin-name" class="form-control"
+                     placeholder="So the rest of the house knows who set this up" autocomplete="name" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="email">Email</label>
+              <input type="email" id="email" class="form-control" placeholder="you@example.com"
+                     autocomplete="username" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="password">Password</label>
+              <input type="password" id="password" class="form-control"
+                     autocomplete="new-password" minlength="6" required>
+              <small class="form-hint">At least 6 characters.</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100" id="register-submit">
+              <i class="ti ti-building-community me-1"></i> Register this gharmandir
+            </button>
+          </form>
+        </div>
+
+        <!-- Shown once the account exists, before or after approval -->
+        <div id="pane-done" hidden>
+          <div class="text-center">
+            <span class="avatar avatar-lg bg-primary-lt mb-3"><i class="ti ti-clock-hour-4 fs-1"></i></span>
+            <h2 class="h4 mb-2" id="done-title">Thanks — you're on the list</h2>
+            <p class="text-secondary" id="done-body"></p>
+            <a href="login.html" class="btn w-100 mt-2">
+              <i class="ti ti-login me-1"></i> Go to sign in
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="text-secondary text-center mt-3 mb-0 small">
+      Already registered? <a href="login.html">Sign in</a>.
+    </p>
+
+  </div>
+</div>
+
+<script type="module">
+import { signUp, stashPendingRegistration } from './js/auth.js';
+import { registerMandir } from './js/api/mandirs.js';
+import { applyTheme, MARK_SVG } from './js/lib/ui.js';
+import { GOOGLE_MAPS_KEY } from './js/config.js';
+
+applyTheme();
+document.getElementById('brand-mark').innerHTML = MARK_SVG;
+
+const err = document.getElementById('err');
+const paneForm = document.getElementById('pane-form');
+const paneDone = document.getElementById('pane-done');
+const form = document.getElementById('register-form');
+const submitBtn = document.getElementById('register-submit');
+const addressInput = document.getElementById('address');
+
+function fail(msg) {
+  err.textContent = msg;
+  err.classList.remove('d-none');
+}
+function clearError() {
+  err.classList.add('d-none');
+}
+form.addEventListener('input', clearError);
+
+function showDone(title, body) {
+  paneForm.hidden = true;
+  paneDone.hidden = false;
+  document.getElementById('done-title').textContent = title;
+  document.getElementById('done-body').textContent = body;
+}
+
+// ---------- address autocomplete (optional) ----------
+//
+// Degrades to a plain text field with no key configured, or if Google's
+// script fails to load — the address is still saved as free text either
+// way, just without lat/lng.
+
+let picked = { address: null, lat: null, lng: null };
+
+addressInput.addEventListener('input', () => { picked = { address: null, lat: null, lng: null }; });
+
+if (GOOGLE_MAPS_KEY) {
+  const hint = document.getElementById('address-hint');
+  window.__gmAutocompleteReady = () => {
+    const ac = new google.maps.places.Autocomplete(addressInput, { types: ['address'] });
+    ac.addListener('place_changed', () => {
+      const place = ac.getPlace();
+      const loc = place.geometry?.location;
+      picked = {
+        address: place.formatted_address ?? addressInput.value,
+        lat: loc ? loc.lat() : null,
+        lng: loc ? loc.lng() : null
+      };
+    });
+  };
+  const script = document.createElement('script');
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_MAPS_KEY)}`
+    + `&libraries=places&callback=__gmAutocompleteReady&loading=async`;
+  script.async = true;
+  script.onerror = () => { hint.textContent = 'Address suggestions are unavailable right now — you can still type it in.'; };
+  document.head.appendChild(script);
+} else {
+  document.getElementById('address-hint').textContent = '';
+}
+
+// ---------- submit ----------
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearError();
+
+  const fields = {
+    mandirName: document.getElementById('mandir-name').value.trim(),
+    gharName: document.getElementById('ghar-name').value.trim(),
+    address: picked.address ?? (addressInput.value.trim() || null),
+    lat: picked.lat,
+    lng: picked.lng,
+    adminName: document.getElementById('admin-name').value.trim(),
+    contactEmail: document.getElementById('email').value.trim()
+  };
+  const password = document.getElementById('password').value;
+
+  if (!fields.mandirName || !fields.gharName || !fields.adminName || !fields.contactEmail || !password) {
+    return fail('Fill in every field above.');
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Setting up';
+
+  try {
+    const { session } = await signUp(fields.contactEmail, password);
+
+    if (session) {
+      await registerMandir(fields);
+      showDone(
+        'Thanks — you’re on the list',
+        `${fields.mandirName} is waiting for a platform admin to approve it. Sign in any time to check on it.`
+      );
+    } else {
+      // Email confirmation is on for this project — finish registering
+      // the next time requireAuth() sees this account signed in with a
+      // session, which happens right after they confirm and sign in.
+      stashPendingRegistration(fields);
+      showDone(
+        'Confirm your email',
+        `We've sent a confirmation link to ${fields.contactEmail}. Once you confirm it, sign in and we'll finish setting up ${fields.mandirName}.`
+      );
+    }
+  } catch (ex) {
+    fail(ex.message);
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="ti ti-building-community me-1"></i> Register this gharmandir';
+  }
+});
+</script>
+</body>
+</html>

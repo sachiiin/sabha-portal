@@ -6,11 +6,41 @@
 //                   function that checks the PIN. Read-only: dashboard
 //                   and history only.
 //
-// Every page except login.html calls requireAuth() before rendering.
+// Every page except login.html and register.html calls requireAuth()
+// before rendering.
+//
+// A third way in, register.html: signs up a brand-new auth user with no
+// app_users row at all, then calls register_mandir() to create one. If
+// Supabase is set to require email confirmation, that second step can't
+// happen until a session exists, which may be a later page load — see
+// stashPendingRegistration() below.
 
 import { sb, unwrap } from './supabase.js';
+import { registerMandir } from './api/mandirs.js';
 
 let cachedProfile = null;
+
+const PENDING_KEY = 'gm-pending-registration';
+
+// Called by register.js when signUp() doesn't hand back a session right
+// away (email confirmation is on). Stashes the mandir details so the next
+// requireAuth() that finds a session but no app_users row — which happens
+// right after the admin confirms and signs in — can finish the job instead
+// of just bouncing them to the ordinary "not linked" error.
+export function stashPendingRegistration(fields) {
+  try { sessionStorage.setItem(PENDING_KEY, JSON.stringify(fields)); } catch {}
+}
+
+function takePendingRegistration() {
+  try {
+    const raw = sessionStorage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(PENDING_KEY);
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
 
 export async function signIn(email, password) {
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
@@ -19,10 +49,21 @@ export async function signIn(email, password) {
   return data.user;
 }
 
+// Creates the account a brand-new mandir's first admin signs in with.
+// Returns a null session when the Supabase project requires email
+// confirmation — register.js stashes the mandir details for that case.
+export async function signUp(email, password) {
+  const { data, error } = await sb.auth.signUp({ email, password });
+  if (error) throw new Error(error.message);
+  cachedProfile = null;
+  return data;
+}
+
 // PIN sign-in. The PIN is never checked in the browser — claim_viewer()
 // compares it against a bcrypt hash inside Postgres and only then writes
-// the app_users row that makes any data readable.
-export async function signInWithPin(pin) {
+// the app_users row that makes any data readable. The ghar name says
+// which house's PIN this is, now that more than one can exist.
+export async function signInWithPin(gharName, pin) {
   const { error: anonError } = await sb.auth.signInAnonymously();
   if (anonError) {
     if (/anonymous.*disabled|signups? not allowed/i.test(anonError.message)) {
@@ -33,7 +74,10 @@ export async function signInWithPin(pin) {
     throw new Error(anonError.message);
   }
 
-  const { data, error } = await sb.rpc('claim_viewer', { pin: pin.trim() });
+  const { data, error } = await sb.rpc('claim_viewer', {
+    p_ghar_name: gharName.trim(),
+    p_pin: pin.trim()
+  });
 
   if (error) {
     await sb.auth.signOut();
@@ -43,7 +87,7 @@ export async function signInWithPin(pin) {
   if (data !== true) {
     // Leave no dangling anonymous session behind a wrong guess.
     await sb.auth.signOut();
-    throw new Error('That PIN is not right.');
+    throw new Error('That ghar name and PIN don’t match.');
   }
 
   cachedProfile = null;
@@ -70,7 +114,7 @@ export async function getProfile() {
 
   const { data: row, error } = await sb
     .from('app_users')
-    .select('id, full_name, role, mandir_id, mandirs(name, ghar_name)')
+    .select('id, full_name, role, platform_admin, mandir_id, mandirs(name, ghar_name, status)')
     .eq('id', session.user.id)
     .maybeSingle();
 
@@ -81,9 +125,11 @@ export async function getProfile() {
     id: row.id,
     name: row.full_name,
     role: row.role,
+    platformAdmin: row.platform_admin,
     mandirId: row.mandir_id,
     mandirName: row.mandirs?.name ?? 'Gharmandir',
-    gharName: row.mandirs?.ghar_name ?? ''
+    gharName: row.mandirs?.ghar_name ?? '',
+    mandirStatus: row.mandirs?.status ?? 'approved'
   };
   return cachedProfile;
 }
@@ -97,13 +143,37 @@ export async function requireAuth({ write = false } = {}) {
     throw new Error('not authenticated');
   }
 
-  const profile = await getProfile();
+  let profile = await getProfile();
+
+  if (!profile) {
+    const pending = takePendingRegistration();
+    if (pending) {
+      try {
+        await registerMandir(pending);
+        cachedProfile = null;
+        profile = await getProfile();
+      } catch {
+        // Falls through to the ordinary nolink handling below — most
+        // likely this account already finished registering elsewhere.
+      }
+    }
+  }
+
   if (!profile) {
     // Signed in to Supabase Auth but not linked to a mandir. For an
     // anonymous session that means the PIN was never accepted.
     await sb.auth.signOut();
     window.location.href = 'login.html?e=nolink';
     throw new Error('no app_users row for this account');
+  }
+
+  // A brand-new mandir from register_mandir() starts 'pending', and stays
+  // unusable until the platform admin approves it — this is the UI side
+  // of that gate; 12-multi-tenant.sql's restrictive policies are the one
+  // that actually matters if this is ever bypassed.
+  if (profile.mandirStatus !== 'approved') {
+    window.location.href = `login.html?e=${profile.mandirStatus}`;
+    throw new Error(`mandir is ${profile.mandirStatus}`);
   }
 
   if (write && !canWrite(profile)) {
@@ -116,6 +186,10 @@ export async function requireAuth({ write = false } = {}) {
 
 export function isAdmin(profile) {
   return profile?.role === 'admin';
+}
+
+export function isPlatformAdmin(profile) {
+  return Boolean(profile?.platformAdmin);
 }
 
 export function isViewer(profile) {

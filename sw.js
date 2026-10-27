@@ -16,6 +16,8 @@ const SHELL = [
   './utilities.html',
   './settings.html',
   './login.html',
+  './register.html',
+  './admin.html',
   './css/styles.css',
   './favicon.svg',
   './manifest.webmanifest',

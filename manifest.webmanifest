@@ -1,7 +1,7 @@
 {
-  "name": "Dasanudas Sabha",
+  "name": "Sabha",
   "short_name": "Sabha",
-  "description": "Weekly sabha attendance for the Dasanudas ghar mandir.",
+  "description": "Weekly sabha attendance, for any gharmandir.",
   "id": "./",
   "start_url": "./index.html",
   "scope": "./",

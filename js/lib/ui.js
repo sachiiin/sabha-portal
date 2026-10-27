@@ -54,7 +54,11 @@ const NAV = [
   // by the restrictive policies in 06-pin-login.sql, not by this list.
   { href: 'members.html',    label: 'Members',    icon: 'users',          key: 'members',    roles: ['admin', 'sevak', 'viewer'] },
   { href: 'utilities.html',  label: 'Utility bills', icon: 'receipt',     key: 'utilities',  roles: ['admin'] },
-  { href: 'settings.html',   label: 'Settings',   icon: 'settings',       key: 'settings',   roles: ['admin'] }
+  { href: 'settings.html',   label: 'Settings',   icon: 'settings',       key: 'settings',   roles: ['admin'] },
+  // Not a role — every mandir has its own admin. This is the one person
+  // (or few) reviewing every mandir's registration, so it is filtered on
+  // profile.platformAdmin below rather than added to any role's list.
+  { href: 'admin.html',      label: 'All Houses', icon: 'building-community', key: 'admin', roles: [], platformOnly: true }
 ];
 
 const ROLE_LABEL = { admin: 'Admin', sevak: 'Sevak', viewer: 'PIN access' };
@@ -77,9 +81,14 @@ export function renderChrome(profile, active) {
   const top = document.getElementById('topbar');
   if (!aside || !top) return;
 
-  const nav = NAV.filter((n) => n.roles.includes(profile.role));
+  const nav = NAV.filter((n) => n.roles.includes(profile.role) || (n.platformOnly && profile.platformAdmin));
   const roleLabel = ROLE_LABEL[profile.role] ?? profile.role;
   const current = nav.find((n) => n.key === active);
+
+  // The static <title> in each page's HTML is just a generic fallback for
+  // the instant before this runs — once a profile loads, the tab should
+  // say whose gharmandir it is, not every house's the same.
+  if (current) document.title = `${current.label} · ${profile.gharName}`;
 
   const initials = profile.name
     .split(' ').filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
