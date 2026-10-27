@@ -71,7 +71,8 @@ sabha-portal/
     ├── 14-platform-team.sql      create/move/promote accounts directly
     ├── 15-platform-house-view.sql  read-only: one house's dashboard/history/roster
     ├── 16-platform-house-view-absences.sql  same, for the Away sections
-    └── 17-mandal-options.sql      this house's mandal categories
+    ├── 17-mandal-options.sql      this house's mandal categories
+    └── 18-house-join-requests.sql join an existing house instead of registering a new one
 ```
 
 ## Setup
@@ -246,6 +247,20 @@ One consequence worth knowing: the house PIN now needs the ghar name
 alongside it (`sql/13-pin-login-multi-tenant.sql`), since `claim_viewer()`
 previously just grabbed the one settings row with a PIN set — fine with a
 single gharmandir, ambiguous the moment a second one exists.
+
+A second sevak from a house that's already registered shouldn't create a
+duplicate mandir — `sql/18-house-join-requests.sql` has register.html
+check the house name and address they typed against every approved
+mandir first, and offers "join this house" instead when one matches.
+Joining still needs the platform admin's say-so, but now it's
+`app_users.status` that's pending, not `mandirs.status` — the house is
+already approved, only this particular person isn't yet. Approvals shows
+these alongside the usual registrations; approving just flips the
+status, and declining blocks the account rather than deleting it —
+actually deleting a Supabase Auth account needs the secret key, which
+this static site never ships to the browser. A blocked account isn't
+gone, though: picking a house for it from Approvals (the same "give
+access" action used to unblock) clears the block as part of doing that.
 
 ## Deploying
 

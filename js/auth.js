@@ -16,7 +16,7 @@
 // stashPendingRegistration() below.
 
 import { sb, unwrap, loginRedirectUrl } from './supabase.js';
-import { registerMandir } from './api/mandirs.js';
+import { registerMandir, joinMandir } from './api/mandirs.js';
 
 let cachedProfile = null;
 
@@ -28,7 +28,13 @@ const PENDING_KEY = 'gm-pending-registration';
 // right after the admin confirms and signs in — can finish the job instead
 // of just bouncing them to the ordinary "not linked" error.
 export function stashPendingRegistration(fields) {
-  try { sessionStorage.setItem(PENDING_KEY, JSON.stringify(fields)); } catch {}
+  try { sessionStorage.setItem(PENDING_KEY, JSON.stringify({ kind: 'register', ...fields })); } catch {}
+}
+
+// Same idea, for someone joining a house that already exists instead of
+// registering a new one — see register.html's duplicate-house check.
+export function stashPendingJoin(mandirId, adminName) {
+  try { sessionStorage.setItem(PENDING_KEY, JSON.stringify({ kind: 'join', mandirId, adminName })); } catch {}
 }
 
 function takePendingRegistration() {
@@ -117,7 +123,7 @@ export async function getProfile() {
 
   const { data: row, error } = await sb
     .from('app_users')
-    .select('id, full_name, role, platform_admin, mandir_id, mandirs(name, ghar_name, status)')
+    .select('id, full_name, role, platform_admin, mandir_id, status, mandirs(name, ghar_name, status)')
     .eq('id', session.user.id)
     .maybeSingle();
 
@@ -132,7 +138,8 @@ export async function getProfile() {
     mandirId: row.mandir_id,
     mandirName: row.mandirs?.name ?? 'Gharmandir',
     gharName: row.mandirs?.ghar_name ?? '',
-    mandirStatus: row.mandirs?.status ?? 'approved'
+    mandirStatus: row.mandirs?.status ?? 'approved',
+    status: row.status ?? 'approved'
   };
   return cachedProfile;
 }
@@ -152,7 +159,11 @@ export async function requireAuth({ write = false } = {}) {
     const pending = takePendingRegistration();
     if (pending) {
       try {
-        await registerMandir(pending);
+        if (pending.kind === 'join') {
+          await joinMandir(pending.mandirId, pending.adminName);
+        } else {
+          await registerMandir(pending);
+        }
         cachedProfile = null;
         profile = await getProfile();
       } catch {
@@ -186,6 +197,15 @@ export async function requireAuth({ write = false } = {}) {
   if (profile.mandirStatus !== 'approved') {
     window.location.href = `login.html?e=${profile.mandirStatus}`;
     throw new Error(`mandir is ${profile.mandirStatus}`);
+  }
+
+  // Separate from the house's own approval above — this account joined
+  // an already-approved house, but the platform admin hasn't approved
+  // this particular person yet (or has blocked them). See
+  // sql/18-house-join-requests.sql.
+  if (profile.status !== 'approved') {
+    window.location.href = `login.html?e=${profile.status === 'blocked' ? 'blocked' : 'join-pending'}`;
+    throw new Error(`user is ${profile.status}`);
   }
 
   if (write && !canWrite(profile)) {

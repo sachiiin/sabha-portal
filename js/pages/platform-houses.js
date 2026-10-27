@@ -90,7 +90,6 @@ function card(m) {
         <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
           <div>
             <div class="fw-medium">${esc(m.ghar_name)}</div>
-            <div class="text-secondary small">${esc(m.name)}</div>
           </div>
           <span class="badge ${STATUS_BADGE[m.status]}">${esc(m.status)}</span>
         </div>

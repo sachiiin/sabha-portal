@@ -164,12 +164,25 @@ const STATUS_COPY = {
     tone: 'bg-danger-lt',
     title: 'Registration not approved',
     body: 'This gharmandir’s registration was not approved. Contact the platform admin if you think that’s a mistake.'
+  },
+  'join-pending': {
+    icon: 'clock-hour-4',
+    tone: 'bg-orange-lt',
+    title: 'Waiting for approval',
+    body: 'A platform admin hasn’t approved your request to join this house yet. Check back soon.'
+  },
+  blocked: {
+    icon: 'lock',
+    tone: 'bg-danger-lt',
+    title: 'Access blocked',
+    body: 'A platform admin has blocked this account. Contact them if you think that’s a mistake.'
   }
 };
 
+const STATUS_CODES = ['pending', 'rejected', 'join-pending', 'blocked'];
 const statusCode = new URLSearchParams(location.search).get('e');
 
-if (statusCode === 'pending' || statusCode === 'rejected') {
+if (STATUS_CODES.includes(statusCode)) {
   const copy = STATUS_COPY[statusCode];
   document.getElementById('status-icon').className = `avatar avatar-lg mb-3 ${copy.tone}`;
   document.getElementById('status-icon').innerHTML = `<i class="ti ti-${copy.icon} fs-1"></i>`;
@@ -186,7 +199,7 @@ document.getElementById('status-signout').addEventListener('click', () => signOu
 sb.auth.getSession().then(({ data }) => {
   // A pending/rejected redirect here came FROM index.html's own session
   // check — following an active session straight back there would loop.
-  if (data.session && statusCode !== 'pending' && statusCode !== 'rejected') {
+  if (data.session && !STATUS_CODES.includes(statusCode)) {
     location.href = 'index.html';
   }
 });

@@ -75,7 +75,7 @@ async function load() {
 
 function render() {
   main.innerHTML = `
-    ${pageHeader(mandir.ghar_name, esc(mandir.name),
+    ${pageHeader(mandir.ghar_name, mandir.address ? esc(mandir.address) : '',
       '<a href="platform-houses.html" class="btn"><i class="ti ti-arrow-left me-1"></i> All Houses</a>')}
     ${tabsBar()}
     <div id="tab-root"></div>`;

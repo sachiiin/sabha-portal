@@ -45,7 +45,7 @@ export async function listAllUsers() {
   return unwrap(
     await sb
       .from('app_users')
-      .select('id, full_name, role, platform_admin, mandir_id, mandirs(ghar_name), created_at')
+      .select('id, full_name, role, platform_admin, mandir_id, status, mandirs(ghar_name), created_at')
       .order('created_at', { ascending: false })
   );
 }
@@ -54,6 +54,14 @@ export async function reassignUser(userId, mandirId, role) {
   return unwrap(
     await sb.rpc('admin_reassign_user', { p_user_id: userId, p_mandir_id: mandirId, p_role: role })
   );
+}
+
+// Approves or blocks a join request, or re-blocks someone later, without
+// touching their house or role. Reassigning (above) is how a blocked
+// account gets un-blocked — picking a house for them is itself the
+// un-block, see sql/18-house-join-requests.sql.
+export async function setUserStatus(userId, status) {
+  return unwrap(await sb.rpc('admin_set_user_status', { p_user_id: userId, p_status: status }));
 }
 
 export async function setPlatformAdmin(userId, flag) {

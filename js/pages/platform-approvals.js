@@ -6,7 +6,7 @@ import {
   renderPlatformChrome, applyTheme, pageHeader, esc, toast, showError, spinner, emptyState
 } from '../lib/ui.js';
 import { listMandirs, setMandirStatus } from '../api/mandirs.js';
-import { listAllUsers } from '../api/team.js';
+import { listAllUsers, setUserStatus, reassignUser } from '../api/team.js';
 import { formatLong } from '../lib/dates.js';
 
 applyTheme();
@@ -14,6 +14,7 @@ applyTheme();
 const main = document.getElementById('main');
 let profile, mandirs, users;
 let tab = 'pending';
+let reassigningId = null;
 
 init();
 
@@ -109,6 +110,149 @@ const STATUS_BADGE = {
   rejected: 'bg-danger-lt'
 };
 
+/* ---------- people: join requests + blocked ---------- */
+
+// A join request: someone picked an already-approved house from
+// register.html instead of creating a new one — waiting on this specific
+// person, not the house, which is why it's app_users.status and not
+// mandirs.status. See sql/18-house-join-requests.sql.
+function joinRequests() {
+  return users.filter((u) => u.status === 'pending' && !u.platform_admin && u.mandir_id);
+}
+
+function blockedUsers() {
+  return users.filter((u) => u.status === 'blocked' && !u.platform_admin);
+}
+
+function peopleSection() {
+  const requests = joinRequests();
+  const blocked = blockedUsers();
+  if (!requests.length && !blocked.length) return '';
+
+  return `<div class="row row-cards mb-3">
+    ${requests.length ? `
+      <div class="col-12 col-lg-6">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Join requests</h3>
+            <div class="card-actions text-secondary small">${requests.length}</div>
+          </div>
+          <div class="list-group list-group-flush">${requests.map(joinRow).join('')}</div>
+        </div>
+      </div>` : ''}
+    ${blocked.length ? `
+      <div class="col-12 col-lg-6">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Blocked</h3>
+            <div class="card-actions text-secondary small">${blocked.length}</div>
+          </div>
+          <div class="list-group list-group-flush">${blocked.map(blockedRow).join('')}</div>
+        </div>
+      </div>` : ''}
+  </div>`;
+}
+
+function joinRow(u) {
+  return `<div class="list-group-item">
+    <div class="row align-items-center g-2">
+      <div class="col">
+        <div class="fw-medium">${esc(u.full_name)}</div>
+        <div class="text-secondary small">
+          Wants to join ${esc(u.mandirs?.ghar_name ?? 'a house')}
+          &middot; ${esc(formatLong(u.created_at.slice(0, 10)))}
+        </div>
+      </div>
+      <div class="col-auto btn-list">
+        <button class="btn btn-sm btn-success" data-user-approve="${u.id}">
+          <i class="ti ti-check me-1"></i> Approve</button>
+        <button class="btn btn-sm btn-ghost-danger" data-user-decline="${u.id}">
+          <i class="ti ti-x me-1"></i> Decline</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function blockedRow(u) {
+  if (reassigningId === u.id) return blockedMoveRow(u);
+
+  return `<div class="list-group-item">
+    <div class="row align-items-center g-2">
+      <div class="col">
+        <div class="fw-medium">${esc(u.full_name)} <span class="badge bg-danger-lt ms-1">Blocked</span></div>
+        <div class="text-secondary small">Was ${esc(u.mandirs?.ghar_name ?? 'no house')}</div>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-sm" data-unblock="${u.id}">
+          <i class="ti ti-lock-open me-1"></i> Give access</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function blockedMoveRow(u) {
+  const approved = mandirs.filter((m) => m.status === 'approved');
+
+  return `<div class="list-group-item">
+    <div class="row g-2 align-items-center">
+      <div class="col-12 col-md-auto fw-medium">${esc(u.full_name)}</div>
+      <div class="col-7 col-md-5">
+        <select class="form-select form-select-sm" id="unblock-mandir-${u.id}">
+          ${approved.map((m) =>
+            `<option value="${m.id}"${m.id === u.mandir_id ? ' selected' : ''}>${esc(m.ghar_name)}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="col-5 col-md-3">
+        <select class="form-select form-select-sm" id="unblock-role-${u.id}">
+          <option value="sevak"${u.role === 'sevak' ? ' selected' : ''}>Sevak</option>
+          <option value="admin"${u.role === 'admin' ? ' selected' : ''}>Admin</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-auto btn-list">
+        <button class="btn btn-sm btn-primary" data-save-unblock="${u.id}">Save</button>
+        <button class="btn btn-sm" data-cancel-unblock="${u.id}">Cancel</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function approveJoin(id) {
+  try {
+    await setUserStatus(id, 'approved');
+    await load();
+    toast('Approved', 'success');
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+async function declineJoin(id) {
+  if (!confirm('Decline this join request? The account is blocked until you give it access somewhere else.')) {
+    return;
+  }
+  try {
+    await setUserStatus(id, 'blocked');
+    await load();
+    toast('Declined', 'success');
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+async function saveUnblock(id) {
+  const mandirId = document.getElementById(`unblock-mandir-${id}`).value;
+  const role = document.getElementById(`unblock-role-${id}`).value;
+  try {
+    await reassignUser(id, mandirId, role);
+    reassigningId = null;
+    await load();
+    toast('Access granted', 'success');
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
 function tabsBar() {
   const counts = { pending: 0, approved: 0, rejected: 0 };
   for (const m of mandirs) counts[m.status] = (counts[m.status] ?? 0) + 1;
@@ -135,6 +279,7 @@ function render() {
   main.innerHTML = `
     ${pageHeader('Approvals', 'Review a new gharmandir before it can be used.')}
     ${summary()}
+    ${peopleSection()}
     ${tabsBar()}
     <div class="card">
       ${rows.length
@@ -149,6 +294,17 @@ function render() {
     b.addEventListener('click', () => act(b.dataset.approve, 'approved')));
   main.querySelectorAll('[data-reject]').forEach((b) =>
     b.addEventListener('click', () => act(b.dataset.reject, 'rejected')));
+
+  main.querySelectorAll('[data-user-approve]').forEach((b) =>
+    b.addEventListener('click', () => approveJoin(b.dataset.userApprove)));
+  main.querySelectorAll('[data-user-decline]').forEach((b) =>
+    b.addEventListener('click', () => declineJoin(b.dataset.userDecline)));
+  main.querySelectorAll('[data-unblock]').forEach((b) =>
+    b.addEventListener('click', () => { reassigningId = b.dataset.unblock; render(); }));
+  main.querySelectorAll('[data-cancel-unblock]').forEach((b) =>
+    b.addEventListener('click', () => { reassigningId = null; render(); }));
+  main.querySelectorAll('[data-save-unblock]').forEach((b) =>
+    b.addEventListener('click', () => saveUnblock(b.dataset.saveUnblock)));
 }
 
 function row(m) {
@@ -166,8 +322,7 @@ function row(m) {
     <div class="row align-items-center g-2">
       <div class="col">
         <div class="d-flex align-items-center gap-2 flex-wrap">
-          <span class="fw-medium">${esc(m.name)}</span>
-          <span class="text-secondary">&middot; ${esc(m.ghar_name)}</span>
+          <span class="fw-medium">${esc(m.ghar_name)}</span>
           <span class="badge ${STATUS_BADGE[m.status]}">${esc(m.status)}</span>
         </div>
         <div class="text-secondary small mt-1">
