@@ -95,22 +95,24 @@ end $$;
 revoke all on function register_mandir(text, text, text, text, text, text, text, text) from public;
 grant execute on function register_mandir(text, text, text, text, text, text, text, text) to authenticated;
 
--- ---------- find_registered_mandir(): structured fields, whitespace-insensitive ----------
+-- ---------- find_registered_mandir(): same name, OR same address ----------
 --
--- The ghar name is the required, reliable signal — ignoring ALL
--- whitespace (not just leading/trailing), so "Dasanu Das" matches
--- "Dasanudas". Address only narrows it down for a mandir that has
--- address_line filled in — the one column here that is genuinely new:
--- it's null for every row created before this migration, including the
--- original single-tenant seed, which separately has a leftover, unrelated
--- value in the pre-existing `city` column (01-schema.sql had city text
--- from the start) that has nothing to do with a real registration and
--- must not be allowed to block a match. So a null address_line means
--- "this row predates structured addresses" — rely on ghar_name alone and
--- ignore whatever city/province/postal_code happen to hold. A row that
--- DOES have address_line needs the rest to agree too, so two unrelated
--- houses that happen to share a name aren't silently offered as the
--- same one.
+-- Two independent reasons to offer "join this house instead": the house
+-- name matches (ignoring ALL whitespace and case, so "Dasanu Das"
+-- matches "Dasanudas"), or — regardless of what name was typed — the
+-- exact address already belongs to an approved house. Either should
+-- surface the same "already registered" flow.
+--
+-- Address only counts for a mandir that has address_line filled in — the
+-- one column here that is genuinely new: it's null for every row created
+-- before this migration, including the original single-tenant seed,
+-- which separately has a leftover, unrelated value in the pre-existing
+-- `city` column (01-schema.sql had city text from the start) that has
+-- nothing to do with a real registration and must not be allowed to
+-- drive a match. A null address_line means "this row predates structured
+-- addresses" — for the name-match path that falls back to ghar_name
+-- alone; for the address-match path it just means there's no address to
+-- compare, so it can't match that way at all.
 drop function if exists find_registered_mandir(text, text);
 drop function if exists find_registered_mandir(text, text, text, text, text);
 
@@ -120,19 +122,36 @@ create or replace function find_registered_mandir(
 language sql stable security definer
 set search_path = public
 as $$
+  with norm as (
+    select
+      lower(regexp_replace(coalesce(p_ghar_name, ''), '\s+', '', 'g')) as ghar,
+      lower(regexp_replace(coalesce(p_address_line, ''), '\s+', '', 'g')) as addr,
+      coalesce(lower(trim(p_city)), '') as city,
+      coalesce(lower(trim(p_province)), '') as province,
+      coalesce(lower(trim(p_postal_code)), '') as postal
+  )
   select m.id, m.ghar_name
-  from mandirs m
+  from mandirs m, norm
   where m.status = 'approved'
-    and lower(regexp_replace(m.ghar_name, '\s+', '', 'g'))
-      = lower(regexp_replace(coalesce(p_ghar_name, ''), '\s+', '', 'g'))
     and (
-      m.address_line is null
+      (
+        lower(regexp_replace(m.ghar_name, '\s+', '', 'g')) = norm.ghar
+        and (
+          m.address_line is null
+          or (
+            lower(regexp_replace(m.address_line, '\s+', '', 'g')) = norm.addr
+            and coalesce(lower(trim(m.city)), '') = norm.city
+            and coalesce(lower(trim(m.province)), '') = norm.province
+            and coalesce(lower(trim(m.postal_code)), '') = norm.postal
+          )
+        )
+      )
       or (
-        lower(regexp_replace(m.address_line, '\s+', '', 'g'))
-          = lower(regexp_replace(coalesce(p_address_line, ''), '\s+', '', 'g'))
-        and coalesce(lower(trim(m.city)), '') = coalesce(lower(trim(p_city)), '')
-        and coalesce(lower(trim(m.province)), '') = coalesce(lower(trim(p_province)), '')
-        and coalesce(lower(trim(m.postal_code)), '') = coalesce(lower(trim(p_postal_code)), '')
+        m.address_line is not null
+        and lower(regexp_replace(m.address_line, '\s+', '', 'g')) = norm.addr
+        and coalesce(lower(trim(m.city)), '') = norm.city
+        and coalesce(lower(trim(m.province)), '') = norm.province
+        and coalesce(lower(trim(m.postal_code)), '') = norm.postal
       )
     )
   limit 1
