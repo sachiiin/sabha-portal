@@ -7,14 +7,14 @@ import {
   renderChrome, applyTheme, pageHeader, esc, toast, showError, emptyState, spinner
 } from '../lib/ui.js';
 import {
-  listMembers, createMember, updateMember, deactivateMember, reactivateMember
+  listMembers, createMember, updateMember, deactivateMember, reactivateMember,
+  MANDALS, MANDAL_LABEL
 } from '../api/members.js';
 import { initials, formatShort, today } from '../lib/dates.js';
 
 applyTheme();
 
 const main = document.getElementById('main');
-const MANDALS = ['bal', 'kishore', 'yuvak', 'adult', 'senior'];
 
 let profile, members, admin, sevak, editing = null;
 
@@ -136,9 +136,9 @@ function formCard() {
         <div class="row">
           <div class="col-md-6 mb-3">
             <label class="form-label" for="mandal">Mandal</label>
-            <select id="mandal" class="form-select text-capitalize">
+            <select id="mandal" class="form-select">
               ${MANDALS.map((m) =>
-                `<option value="${m}"${(e.mandal ?? 'yuvak') === m ? ' selected' : ''}>${m}</option>`
+                `<option value="${m}"${(e.mandal ?? 'yuvak') === m ? ' selected' : ''}>${MANDAL_LABEL[m]}</option>`
               ).join('')}
             </select>
           </div>
@@ -209,8 +209,8 @@ function rowHTML(m, table = 'active') {
           ${esc(m.full_name)}
           ${m.is_sevak ? '<span class="badge bg-primary-lt ms-1">Sevak</span>' : ''}
         </div>
-        <div class="text-secondary small text-truncate text-capitalize">
-          ${esc(m.mandal)}${sevak && m.phone
+        <div class="text-secondary small text-truncate">
+          ${esc(MANDAL_LABEL[m.mandal] ?? m.mandal)}${sevak && m.phone
             ? ` &middot; <span class="text-lowercase">${esc(m.phone)}</span>`
             : ''}
         </div>

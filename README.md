@@ -70,7 +70,8 @@ sabha-portal/
     ├── 13-pin-login-multi-tenant.sql
     ├── 14-platform-team.sql      create/move/promote accounts directly
     ├── 15-platform-house-view.sql  read-only: one house's dashboard/history/roster
-    └── 16-platform-house-view-absences.sql  same, for the Away sections
+    ├── 16-platform-house-view-absences.sql  same, for the Away sections
+    └── 17-mandal-options.sql      this house's mandal categories
 ```
 
 ## Setup

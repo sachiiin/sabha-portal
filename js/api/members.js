@@ -5,6 +5,13 @@
 import { sb, unwrap } from '../supabase.js';
 import { today } from '../lib/dates.js';
 
+// This house's own mandal structure — see sql/17-mandal-options.sql for
+// the matching database constraint. Values are stored as these slugs;
+// MANDAL_LABEL is how each one is actually written, since "to-be-ambrish"
+// capitalized by CSS would read as "To-be-ambrish", not "To-be Ambrish".
+export const MANDALS = ['yuvak', 'ambrish', 'to-be-ambrish'];
+export const MANDAL_LABEL = { yuvak: 'Yuvak', ambrish: 'Ambrish', 'to-be-ambrish': 'To-be Ambrish' };
+
 // Was this yuvak living in the house on a given date?
 // Used by the attendance page against the sabha's own date, and by the
 // dashboard and history against today.

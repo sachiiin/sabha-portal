@@ -16,7 +16,7 @@ import {
   emptyState, statusDot, statusLegend
 } from '../lib/ui.js';
 import { getMandir } from '../api/mandirs.js';
-import { listMembers, listStats, isCurrent } from '../api/members.js';
+import { listMembers, listStats, isCurrent, MANDAL_LABEL } from '../api/members.js';
 import { getSettings, listSabhas } from '../api/sabhas.js';
 import {
   attendanceTrend, fullHistory, historyForMember, currentStreak, missedStreak
@@ -834,7 +834,7 @@ function memberRow(m, faded = false) {
         <div class="text-truncate">
           ${esc(m.full_name)}${m.is_sevak ? ' <span class="badge bg-primary-lt ms-1">Sevak</span>' : ''}
         </div>
-        <div class="text-secondary small text-truncate text-capitalize">${esc(m.mandal)}</div>
+        <div class="text-secondary small text-truncate">${esc(MANDAL_LABEL[m.mandal] ?? m.mandal)}</div>
         ${houseSpan(m)}
       </div>
     </div>
