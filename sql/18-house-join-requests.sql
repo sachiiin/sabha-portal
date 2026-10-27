@@ -160,9 +160,14 @@ grant execute on function admin_reassign_user(uuid, uuid, text) to authenticated
 -- isn't caught by it — their own app_users row stays status='approved'
 -- by default either way, but this keeps the pattern consistent and
 -- correct if that ever changes.
+drop policy if exists "approved users only: members" on members;
 create policy "approved users only: members" on members
   as restrictive for all using (my_user_approved() or is_platform_admin());
+
+drop policy if exists "approved users only: sabhas" on sabhas;
 create policy "approved users only: sabhas" on sabhas
   as restrictive for all using (my_user_approved() or is_platform_admin());
+
+drop policy if exists "approved users only: attendance" on attendance;
 create policy "approved users only: attendance" on attendance
   as restrictive for all using (my_user_approved() or is_platform_admin());
