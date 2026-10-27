@@ -61,22 +61,26 @@ function render() {
           </div>
           <div class="card-body">
             <p class="text-secondary">
-              Anyone with this PIN can open the dashboard and history. They cannot
-              record attendance or change the roster.
+              Anyone with your ghar name and this PIN can open the dashboard and
+              history. They cannot record attendance or change the roster.
             </p>
 
-            ${pinOn
-              ? `<div class="datagrid mb-3">
-                   <div class="datagrid-item">
+            <div class="datagrid mb-3">
+              <div class="datagrid-item">
+                <div class="datagrid-title">Ghar name</div>
+                <div class="datagrid-content">${esc(profile.gharName)}</div>
+              </div>
+              ${pinOn
+                ? `<div class="datagrid-item">
                      <div class="datagrid-title">Last changed</div>
                      <div class="datagrid-content">${esc(formatLong(settings.pin_set_at.slice(0, 10)))}</div>
                    </div>
                    <div class="datagrid-item">
                      <div class="datagrid-title">Active PIN sessions</div>
                      <div class="datagrid-content">${sessions}</div>
-                   </div>
-                 </div>`
-              : ''}
+                   </div>`
+                : ''}
+            </div>
 
             <form id="pin-form" novalidate>
               <div class="mb-3">
@@ -86,8 +90,9 @@ function render() {
                 <input type="text" id="pin" class="form-control" autocomplete="off"
                        inputmode="numeric" placeholder="At least 4 characters">
                 <small class="form-hint">
-                  Six digits is plenty. You will need to tell the yuvaks what it is —
-                  this page cannot show it to you again.
+                  Six digits is plenty. Share it with the sevako along with your ghar
+                  name, "${esc(profile.gharName)}" — signing in with the PIN takes
+                  both, and this page cannot show the PIN to you again.
                 </small>
               </div>
               <div class="mb-3">
@@ -140,8 +145,10 @@ function render() {
           <div class="card-header"><h3 class="card-title">How PIN access works</h3></div>
           <div class="card-body text-secondary">
             <p>
-              The PIN is stored as a hash, so nobody — including you — can read it
-              back out of the database. If it is forgotten, set a new one.
+              Signing in with the PIN takes the ghar name too, since this portal can
+              serve more than one gharmandir. The PIN itself is stored as a hash, so
+              nobody — including you — can read it back out of the database. If it
+              is forgotten, set a new one.
             </p>
             <p>
               <strong class="text-body">Sign out PIN users</strong> ends every current
@@ -180,7 +187,7 @@ async function onSetPin(ev) {
 
   try {
     await setHousePin(pin);
-    toast('PIN saved. Tell the yuvaks the new number.', 'success');
+    toast(`PIN saved. Tell the sevako the new number, along with "${profile.gharName}".`, 'success');
     await load();
   } catch (e) {
     toast(e.message, 'error');
