@@ -59,17 +59,17 @@ const NAV = [
 
 const ROLE_LABEL = { admin: 'Admin', sevak: 'Sevak', viewer: 'PIN access' };
 
-// The house mark. Inline rather than an <img> so it inherits the chip's
-// colour and stays crisp at any size. The matching favicon.svg carries
-// its own orange tile.
+// The mandir mark: a shikhara (temple spire) over an arched doorway.
+// Inline rather than an <img> so the body inherits the chip's colour and
+// stays crisp at any size. The kalash finial uses --gm-accent rather than
+// a fixed hex, because this chip's own background is --tblr-primary and
+// that swaps with --gm-accent between light and dark mode — a hardcoded
+// finial colour would vanish into the chip in one of the two themes.
+// The matching favicon.svg carries its own fixed navy tile.
 export const MARK_SVG = `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-  <circle cx="16" cy="7.2" r="2.2" fill="currentColor"/>
-  <g fill="none" stroke="currentColor" stroke-width="2.8"
-     stroke-linecap="round" stroke-linejoin="round">
-    <path d="M5.5 16 16 8.5 26.5 16"/>
-    <path d="M8.5 15.5v9h15v-9"/>
-  </g>
-  <path d="M13.2 24.5v-4.2a2.8 2.8 0 0 1 5.6 0v4.2z" fill="currentColor"/>
+  <circle cx="16" cy="6" r="1.5" fill="var(--gm-accent)"/>
+  <path fill="currentColor" d="M16 7.5 C14.3 7.5 13 10 13.3 13 C13.5 15.3 14 17 14.6 18.6 L17.4 18.6 C18 17 18.5 15.3 18.7 13 C19 10 17.7 7.5 16 7.5 Z"/>
+  <path fill="currentColor" fill-rule="evenodd" d="M7.5 18.4 H24.5 V27 a1.5 1.5 0 0 1 -1.5 1.5 H9 a1.5 1.5 0 0 1 -1.5 -1.5 Z M13 28.5 v-5 a3 3 0 0 1 6 0 v5 Z"/>
 </svg>`;
 
 export function renderChrome(profile, active) {
@@ -344,9 +344,14 @@ export function toast(message, kind = 'info') {
     <button type="button" class="btn-close ms-2" data-bs-dismiss="toast" aria-label="Close"></button>
   </div>`;
 
+  const dismiss = () => {
+    el.classList.add('gm-toast-out');
+    setTimeout(() => el.remove(), 160);
+  };
+
   host.appendChild(el);
-  el.querySelector('.btn-close').addEventListener('click', () => el.remove());
-  setTimeout(() => el.remove(), 4000);
+  el.querySelector('.btn-close').addEventListener('click', dismiss);
+  setTimeout(dismiss, 4000);
 }
 
 /* ---------- states ---------- */

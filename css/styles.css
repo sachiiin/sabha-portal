@@ -6,40 +6,41 @@
 
 :root,
 [data-bs-theme='light'] {
-  /* Royal amethyst, with antique gold as the brand accent — a jewel-tone
-     palette: purple throne, gold trim, emerald/sapphire/ruby for status. */
-  --tblr-primary: #4c1d95;
-  --tblr-primary-rgb: 76, 29, 149;
+  /* Navy as the anchor, coral as the spark, cream/mauve/dusty-rose
+     carrying the rest — one palette used both ways: navy is the light-mode
+     button colour and the dark-mode page itself; coral mirrors it. */
+  --tblr-primary: #0b1130;
+  --tblr-primary-rgb: 11, 17, 48;
   --tblr-primary-fg: #ffffff;
-  --tblr-link-color: #4c1d95;
-  --tblr-link-color-rgb: 76, 29, 149;
-  --tblr-link-hover-color: #341469;
-  --tblr-body-bg: #f8f6fb;
+  --tblr-link-color: #7a4c66;
+  --tblr-link-color-rgb: 122, 76, 102;
+  --tblr-link-hover-color: #0b1130;
+  --tblr-body-bg: #fff7e8;
   --tblr-border-radius: 10px;
 
   --gm-good: #047857;
   --gm-watch: #b45309;
   --gm-low: #be123c;
   --gm-info: #1d4ed8;
-  --gm-gold: #a6791e;
-  --gm-gold-rgb: 166, 121, 30;
+  --gm-accent: #ff9f7a;
+  --gm-accent-rgb: 255, 159, 122;
 }
 
 [data-bs-theme='dark'] {
-  --tblr-primary: #a78bfa;
-  --tblr-primary-rgb: 167, 139, 250;
-  --tblr-primary-fg: #1e1333;
-  --tblr-link-color: #c4b5fd;
-  --tblr-link-color-rgb: 196, 181, 253;
-  --tblr-link-hover-color: #ddd6fe;
-  --tblr-body-bg: #140f1f;
+  --tblr-primary: #ff9f7a;
+  --tblr-primary-rgb: 255, 159, 122;
+  --tblr-primary-fg: #0b1130;
+  --tblr-link-color: #f2c2ce;
+  --tblr-link-color-rgb: 242, 194, 206;
+  --tblr-link-hover-color: #fde3b4;
+  --tblr-body-bg: #0b1130;
 
   --gm-good: #34d399;
   --gm-watch: #fbbf24;
   --gm-low: #fb7185;
   --gm-info: #60a5fa;
-  --gm-gold: #e8c766;
-  --gm-gold-rgb: 232, 199, 102;
+  --gm-accent: #fde3b4;
+  --gm-accent-rgb: 253, 227, 180;
 }
 
 /* ---------- typography ---------- */
@@ -69,6 +70,57 @@
     box-shadow 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
+/* ---------- motion ---------- */
+
+@keyframes gm-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes gm-pop-in {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes gm-spin-in {
+  from { opacity: 0; transform: rotate(-90deg) scale(0.5); }
+  to   { opacity: 1; transform: rotate(0) scale(1); }
+}
+@keyframes gm-toast-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes gm-toast-out {
+  to { opacity: 0; transform: translateY(6px) scale(0.97); }
+}
+
+/* Every page section is freshly built HTML on each render(), so a plain
+   entrance animation on these classes replays naturally on navigation —
+   no JS wiring needed. Kept short and small so it reads as a settle,
+   not a show. */
+.page-header, .card {
+  animation: gm-fade-up 0.32s ease both;
+}
+#theme-toggle i {
+  animation: gm-spin-in 0.3s ease both;
+}
+.toast {
+  animation: gm-toast-in 0.22s ease both;
+}
+.toast.gm-toast-out {
+  animation: gm-toast-out 0.16s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-header, .card, #theme-toggle i, .toast, .toast.gm-toast-out,
+  .gm-mark--lg {
+    animation: none;
+  }
+  .btn, .form-control, .form-select, .card, .badge, .nav-link,
+  .gm-seg .btn, .gm-range button, .gm-collapse, .gm-hamburger, .gm-navclose,
+  #sidebar, .page-wrapper, .gm-backdrop {
+    transition: none;
+  }
+}
+
 /* ---------- shell ---------- */
 
 /* Softer, rounder surfaces than Tabler's default, and a page background
@@ -76,7 +128,7 @@
 .card {
   border-radius: 20px;
   border-color: transparent;
-  box-shadow: 0 1px 2px rgba(29, 12, 58, 0.04), 0 10px 28px -14px rgba(29, 12, 58, 0.16);
+  box-shadow: 0 1px 2px rgba(11, 17, 48, 0.05), 0 10px 28px -14px rgba(11, 17, 48, 0.18);
 }
 [data-bs-theme='dark'] .card {
   border-color: var(--tblr-border-color);
@@ -98,7 +150,7 @@
   box-shadow: 0 6px 18px -6px rgba(var(--tblr-primary-rgb), 0.55);
   transform: translateY(-1px);
 }
-.btn:active { transform: translateY(0); }
+.btn:active { transform: translateY(0) scale(0.97); }
 
 .form-control:focus, .form-select:focus {
   border-color: var(--tblr-primary);
@@ -213,7 +265,7 @@
   color: var(--tblr-primary);
 }
 .gm-sidebar .nav-item.active > .nav-link {
-  background: var(--tblr-primary-lt, rgba(76, 29, 149, 0.12));
+  background: var(--tblr-primary-lt, rgba(11, 17, 48, 0.1));
   font-weight: 500;
 }
 .gm-sidebar .nav-item:not(.active) > .nav-link:hover {
@@ -257,7 +309,7 @@ body.gm-mini .gm-sidebar .nav-link-icon { font-size: 1.25rem; }
 
 .gm-backdrop {
   position: fixed; inset: 0;
-  background: rgba(16, 12, 8, 0.45);
+  background: rgba(11, 17, 48, 0.45);
   opacity: 0; pointer-events: none;
   transition: opacity 0.2s ease;
   z-index: 1035;
@@ -378,12 +430,13 @@ body.gm-mini .gm-sidebar .nav-link-icon { font-size: 1.25rem; }
   background: var(--tblr-primary);
   color: var(--tblr-primary-fg);
   display: grid; place-items: center;
-  box-shadow: 0 0 0 2px rgba(var(--gm-gold-rgb), 0.45);
+  box-shadow: 0 0 0 2px rgba(var(--gm-accent-rgb), 0.5);
 }
 .gm-mark svg { width: 100%; height: 100%; display: block; }
 .gm-mark--lg {
   width: 56px; height: 56px; border-radius: 17px;
-  box-shadow: 0 0 0 3px rgba(var(--gm-gold-rgb), 0.5), 0 10px 24px -10px rgba(var(--tblr-primary-rgb), 0.5);
+  box-shadow: 0 0 0 3px rgba(var(--gm-accent-rgb), 0.55), 0 10px 24px -10px rgba(var(--tblr-primary-rgb), 0.5);
+  animation: gm-pop-in 0.4s cubic-bezier(.34, 1.56, .64, 1) both;
 }
 
 /* ---------- attendance status ---------- */
