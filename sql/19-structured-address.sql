@@ -97,13 +97,22 @@ grant execute on function register_mandir(text, text, text, text, text, text, te
 
 -- ---------- find_registered_mandir(): structured fields, whitespace-insensitive ----------
 --
--- Ignores ALL whitespace (not just leading/trailing) in the ghar name
--- and the street address, so "Dasanu Das" still matches "Dasanudas" and
--- "123   Main St" matches "123 Main St". City/province/postal come from
--- dropdowns and a formatted input, so a plain trim+lowercase is enough
--- for those.
-
+-- The ghar name is the required, reliable signal — ignoring ALL
+-- whitespace (not just leading/trailing), so "Dasanu Das" matches
+-- "Dasanudas". Address only narrows it down for a mandir that has
+-- address_line filled in — the one column here that is genuinely new:
+-- it's null for every row created before this migration, including the
+-- original single-tenant seed, which separately has a leftover, unrelated
+-- value in the pre-existing `city` column (01-schema.sql had city text
+-- from the start) that has nothing to do with a real registration and
+-- must not be allowed to block a match. So a null address_line means
+-- "this row predates structured addresses" — rely on ghar_name alone and
+-- ignore whatever city/province/postal_code happen to hold. A row that
+-- DOES have address_line needs the rest to agree too, so two unrelated
+-- houses that happen to share a name aren't silently offered as the
+-- same one.
 drop function if exists find_registered_mandir(text, text);
+drop function if exists find_registered_mandir(text, text, text, text, text);
 
 create or replace function find_registered_mandir(
   p_ghar_name text, p_address_line text, p_city text, p_province text, p_postal_code text
@@ -116,11 +125,16 @@ as $$
   where m.status = 'approved'
     and lower(regexp_replace(m.ghar_name, '\s+', '', 'g'))
       = lower(regexp_replace(coalesce(p_ghar_name, ''), '\s+', '', 'g'))
-    and lower(regexp_replace(coalesce(m.address_line, ''), '\s+', '', 'g'))
-      = lower(regexp_replace(coalesce(p_address_line, ''), '\s+', '', 'g'))
-    and coalesce(lower(trim(m.city)), '') = coalesce(lower(trim(p_city)), '')
-    and coalesce(lower(trim(m.province)), '') = coalesce(lower(trim(p_province)), '')
-    and coalesce(lower(trim(m.postal_code)), '') = coalesce(lower(trim(p_postal_code)), '')
+    and (
+      m.address_line is null
+      or (
+        lower(regexp_replace(m.address_line, '\s+', '', 'g'))
+          = lower(regexp_replace(coalesce(p_address_line, ''), '\s+', '', 'g'))
+        and coalesce(lower(trim(m.city)), '') = coalesce(lower(trim(p_city)), '')
+        and coalesce(lower(trim(m.province)), '') = coalesce(lower(trim(p_province)), '')
+        and coalesce(lower(trim(m.postal_code)), '') = coalesce(lower(trim(p_postal_code)), '')
+      )
+    )
   limit 1
 $$;
 
