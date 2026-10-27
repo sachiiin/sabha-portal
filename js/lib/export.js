@@ -1,5 +1,12 @@
 // CSV export. Builds the file in the browser — no server round trip.
 
+// A ghar name turned into something safe for a filename, so an export
+// downloads as "that-house-attendance-....csv" rather than naming a
+// different gharmandir's house — every export call below takes one.
+export function slug(name) {
+  return String(name ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'export';
+}
+
 function csvCell(value) {
   const s = String(value ?? '');
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;

@@ -69,7 +69,8 @@ sabha-portal/
     ├── 12-multi-tenant.sql       registration, approval, platform admin
     ├── 13-pin-login-multi-tenant.sql
     ├── 14-platform-team.sql      create/move/promote accounts directly
-    └── 15-platform-house-view.sql  read-only: one house's dashboard/history/roster
+    ├── 15-platform-house-view.sql  read-only: one house's dashboard/history/roster
+    └── 16-platform-house-view-absences.sql  same, for the Away sections
 ```
 
 ## Setup
@@ -210,15 +211,18 @@ Registration (`sql/12-multi-tenant.sql`) layers two more things on top:
 - The platform admin's visibility was originally this narrow by design —
   a mandir's name, address and registering admin's contact details, never
   its members, sabhas or attendance — but `sql/15-platform-house-view.sql`
-  adds an explicit, read-only exception: opening a house from **All
-  Houses** shows its actual dashboard, sabha history and roster, plus who
-  has a login there. It's deliberately narrow in its own way: four new
-  SELECT-only policies, so nothing a platform admin does through this can
-  ever write to a house's data, only look at it. `js/api/members.js`,
-  `sabhas.js` and `attendance.js` all already took an explicit mandirId
-  argument rather than assuming the caller's own, so `platform-house.js`
-  reuses them completely unchanged — only the database side had to learn
-  to allow it.
+  and `sql/16-platform-house-view-absences.sql` add an explicit, read-only
+  exception: opening a house from **All Houses** shows exactly what a PIN
+  viewer of that house would see — the same stats, charts, attendance
+  grid with notes, away periods, CSV export and member roster, split
+  across tabs — plus who has a login there. It's deliberately narrow in
+  its own way: five new SELECT-only policies, so nothing a platform admin
+  does through this can ever write to a house's data, only look at it.
+  `js/api/members.js`, `sabhas.js` and `attendance.js` all already took an
+  explicit mandirId argument rather than assuming the caller's own, and
+  `js/lib/charts.js` and `export.js` are pure, profile-independent
+  utilities already, so `platform-house.js` reuses all of it completely
+  unchanged — only the database side had to learn to allow the reads.
 
 `sql/14-platform-team.sql` extends that same visibility to `app_users`
 itself, so **Team & Users** can list every account on the platform —

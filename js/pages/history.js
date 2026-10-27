@@ -9,7 +9,7 @@ import { listMembers, listStats, isCurrent } from '../api/members.js';
 import { listSabhas } from '../api/sabhas.js';
 import { fullHistory } from '../api/attendance.js';
 import { listAbsences } from '../api/utilities.js';
-import { exportAttendance, exportSummary } from '../lib/export.js';
+import { exportAttendance, exportSummary, slug } from '../lib/export.js';
 import { formatShort, formatLong, initials, today, monthKey, monthName } from '../lib/dates.js';
 import { band } from '../lib/schedule.js';
 
@@ -97,14 +97,14 @@ function render() {
         status: r.status,
         reason: r.reason ?? ''
       })),
-      `dasanudas-attendance-${new Date().toISOString().slice(0, 10)}.csv`
+      `${slug(profile.gharName)}-attendance-${new Date().toISOString().slice(0, 10)}.csv`
     );
     toast('Downloaded', 'success');
   });
 
   document.getElementById('exp-summary').addEventListener('click', () => {
     if (!stats.length) return toast('Nothing to export yet', 'error');
-    exportSummary(stats, `dasanudas-summary-${new Date().toISOString().slice(0, 10)}.csv`);
+    exportSummary(stats, `${slug(profile.gharName)}-summary-${new Date().toISOString().slice(0, 10)}.csv`);
     toast('Downloaded', 'success');
   });
 
