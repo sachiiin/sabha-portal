@@ -32,6 +32,7 @@
       <div class="card-body">
 
         <div class="alert alert-danger d-none py-2 px-3" id="err" role="alert"></div>
+        <div class="alert alert-success d-none py-2 px-3" id="msg" role="status"></div>
 
         <!-- PIN -->
         <div id="pane-pin">
@@ -85,6 +86,10 @@
             <button type="submit" class="btn btn-primary w-100" id="admin-submit">Sign in</button>
           </form>
 
+          <p class="text-center mt-3 mb-0 small">
+            <a href="#" id="resend-link">Resend confirmation email</a>
+          </p>
+
           <div class="hr-text hr-text-center my-4">or</div>
 
           <button class="btn w-100" id="to-pin">
@@ -119,24 +124,32 @@
 
 <script type="module">
 import { signIn, signInWithPin, signOut } from './js/auth.js';
-import { sb } from './js/supabase.js';
+import { sb, loginRedirectUrl } from './js/supabase.js';
 import { applyTheme, MARK_SVG } from './js/lib/ui.js';
 
 applyTheme();
 document.getElementById('brand-mark').innerHTML = MARK_SVG;
 
 const err = document.getElementById('err');
+const msg = document.getElementById('msg');
 const panePin = document.getElementById('pane-pin');
 const paneAdmin = document.getElementById('pane-admin');
 const paneStatus = document.getElementById('pane-status');
 const helpPin = document.getElementById('help-pin');
 
-function fail(msg) {
-  err.textContent = msg;
+function fail(text) {
+  msg.classList.add('d-none');
+  err.textContent = text;
   err.classList.remove('d-none');
+}
+function succeed(text) {
+  err.classList.add('d-none');
+  msg.textContent = text;
+  msg.classList.remove('d-none');
 }
 function clearError() {
   err.classList.add('d-none');
+  msg.classList.add('d-none');
 }
 
 function show(which) {
@@ -261,6 +274,48 @@ adminForm.addEventListener('submit', async (e) => {
     fail(ex.message);
     adminSubmit.disabled = false;
     adminSubmit.textContent = 'Sign in';
+  }
+});
+
+// --- resend confirmation ---
+//
+// "Invalid login credentials" covers both a wrong password AND an
+// unconfirmed email — Supabase won't say which, on purpose, so this link
+// doesn't try to tell them apart either. Always sends to loginRedirectUrl();
+// an account the platform admin created would end up back here rather
+// than account.html's "set your password" welcome, but they can still
+// find that page from their own account menu once signed in.
+
+const resendLink = document.getElementById('resend-link');
+
+resendLink.addEventListener('click', async (e) => {
+  e.preventDefault();
+  clearError();
+
+  const email = document.getElementById('email').value.trim();
+  if (!email) {
+    fail('Enter your email above first.');
+    document.getElementById('email').focus();
+    return;
+  }
+
+  resendLink.classList.add('disabled');
+  const original = resendLink.textContent;
+  resendLink.textContent = 'Sending…';
+
+  try {
+    const { error } = await sb.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: loginRedirectUrl() }
+    });
+    if (error) throw error;
+    succeed(`Confirmation email sent to ${email}. Check your inbox.`);
+  } catch (ex) {
+    fail(ex.message);
+  } finally {
+    resendLink.classList.remove('disabled');
+    resendLink.textContent = original;
   }
 });
 </script>
