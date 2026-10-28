@@ -1,0 +1,57 @@
+<!--
+  Supabase Auth → Emails → "Confirm sign up" template.
+  The only auth email this app actually sends — nothing in the code
+  triggers Invite user, Magic link/OTP, Change email, Reset password or
+  Reauthentication. Paste this whole file into the template's "Message
+  body" field (keep {{ .ConfirmationURL }} exactly as-is — Supabase fills
+  it in). Suggested subject: "Confirm your email · Etobicoke Sabha"
+
+  Table-based layout + inline styles throughout: email clients don't
+  reliably support external CSS or modern layout, so this follows the
+  same conservative markup every transactional email template uses.
+  Colours match css/styles.css's light-mode palette (email has no dark
+  mode toggle, so there's only one version).
+-->
+<div style="background-color:#fff7e8; padding:32px 16px; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; margin:0 auto; border-collapse:collapse;">
+    <tr>
+      <td style="text-align:center; padding-bottom:24px;">
+        <div style="font-family:Georgia,'Times New Roman',serif; font-size:28px; color:#0b1130; font-weight:400;">
+          Etobicoke Sabha
+        </div>
+        <div style="font-family:'Inter',Arial,sans-serif; font-size:11px; letter-spacing:0.09em; text-transform:uppercase; color:#7a4c66; margin-top:4px;">
+          Gharmandir attendance, for any house
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color:#ffffff; border-radius:16px; padding:36px 32px;">
+        <p style="font-size:16px; color:#0b1130; margin:0 0 20px; line-height:1.5;">
+          Jay Swaminarayan Das na Das Banavshoji 🙏
+        </p>
+        <p style="font-size:15px; color:#3d3d3d; line-height:1.6; margin:0 0 28px;">
+          Confirm your email to finish setting up your account on Etobicoke Sabha.
+        </p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 28px;">
+          <tr>
+            <td style="border-radius:10px; background-color:#0b1130;">
+              <a href="{{ .ConfirmationURL }}"
+                 style="display:inline-block; padding:14px 32px; font-family:'Inter',Arial,sans-serif; font-size:15px; font-weight:600; color:#ffffff; text-decoration:none; border-radius:10px;">
+                Confirm your email
+              </a>
+            </td>
+          </tr>
+        </table>
+        <p style="font-size:13px; color:#8a8a8a; line-height:1.6; margin:0;">
+          If the button doesn't work, copy and paste this link into your browser:<br>
+          <a href="{{ .ConfirmationURL }}" style="color:#7a4c66; word-break:break-all;">{{ .ConfirmationURL }}</a>
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="text-align:center; padding-top:24px;">
+        <p style="font-size:14px; color:#0b1130; margin:0;">Thank you 🙏</p>
+      </td>
+    </tr>
+  </table>
+</div>
