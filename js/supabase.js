@@ -27,3 +27,12 @@ export function unwrap({ data, error }) {
 export function loginRedirectUrl() {
   return new URL('login.html', window.location.href).href;
 }
+
+// Where an account created BY an admin (Team & Users) should land after
+// confirming its email — straight to "set your own password," since the
+// admin only ever picked a starting one for them. Someone confirming
+// their OWN self-registration already chose their password at sign-up
+// and keeps going to loginRedirectUrl() instead; see js/api/team.js.
+export function accountRedirectUrl() {
+  return new URL('account.html?welcome=1', window.location.href).href;
+}

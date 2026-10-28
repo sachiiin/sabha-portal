@@ -38,8 +38,16 @@ async function init() {
 }
 
 function render() {
+  const welcome = new URLSearchParams(location.search).get('welcome') === '1';
+
   main.innerHTML = `
     ${pageHeader('My account', esc(profile.name))}
+
+    ${welcome ? `
+      <div class="alert alert-info">
+        <i class="ti ti-hand-sparkles me-1"></i>
+        Welcome — set a password only you know to finish setting up your account.
+      </div>` : ''}
 
     <div class="row justify-content-center">
       <div class="col-12 col-lg-6">
