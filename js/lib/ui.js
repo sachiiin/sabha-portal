@@ -58,14 +58,16 @@ const NAV = [
 ];
 
 // The platform admin's own area is a separate shell entirely (see
-// renderPlatformChrome) — requireAuth() sends a platform-admin account
+// renderPlatformChrome) — requireAuth() sends a platform-level account
 // there and never renders this sidebar for them at all, so a mandir's own
-// people never see a hint that a platform admin exists.
+// people never see a hint that a platform admin exists. `admin` sees
+// every link; a nimitt sevak gets only Dashboard and All Houses — they
+// can't approve a house or manage anyone's account.
 const PLATFORM_NAV = [
-  { href: 'platform-dashboard.html', label: 'Dashboard',    icon: 'chart-pie',          key: 'dashboard' },
-  { href: 'platform-houses.html',    label: 'All Houses',   icon: 'building-community', key: 'houses' },
-  { href: 'platform-approvals.html', label: 'Approvals',    icon: 'clipboard-check',    key: 'approvals' },
-  { href: 'platform-team.html',      label: 'Team & Users', icon: 'users-group',        key: 'team' }
+  { href: 'platform-dashboard.html', label: 'Dashboard',    icon: 'chart-pie',          key: 'dashboard',  roles: ['admin', 'nimitt_sevak'] },
+  { href: 'platform-houses.html',    label: 'All Houses',   icon: 'building-community', key: 'houses',     roles: ['admin', 'nimitt_sevak'] },
+  { href: 'platform-approvals.html', label: 'Approvals',    icon: 'clipboard-check',    key: 'approvals',  roles: ['admin'] },
+  { href: 'platform-team.html',      label: 'Team & Users', icon: 'users-group',        key: 'team',       roles: ['admin'] }
 ];
 
 const ROLE_LABEL = { admin: 'Admin', sevak: 'Sevak', viewer: 'PIN access' };
@@ -209,8 +211,11 @@ export function renderPlatformChrome(profile, active) {
   const top = document.getElementById('topbar');
   if (!aside || !top) return;
 
-  const current = PLATFORM_NAV.find((n) => n.key === active);
-  if (current) document.title = `${current.label} · Platform admin`;
+  const platformRole = profile.nimittSevak ? 'nimitt_sevak' : 'admin';
+  const roleLabel = profile.nimittSevak ? 'Nimitt Sevak' : 'Platform admin';
+  const nav = PLATFORM_NAV.filter((n) => n.roles.includes(platformRole));
+  const current = nav.find((n) => n.key === active);
+  if (current) document.title = `${current.label} · ${roleLabel}`;
 
   const initials = profile.name
     .split(' ').filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
@@ -220,7 +225,7 @@ export function renderPlatformChrome(profile, active) {
       <div class="container-fluid">
         <div class="gm-brand">
           <span class="gm-mark">${MARK_SVG}</span>
-          <span class="gm-wordmark">Sabha<small>Platform admin</small></span>
+          <span class="gm-wordmark">Etobicoke Sabha<small>${esc(roleLabel)}</small></span>
           <button type="button" class="gm-collapse" id="sidebar-collapse"
                   aria-label="Collapse the sidebar" aria-expanded="true">
             <i class="ti ti-chevron-left"></i>
@@ -232,7 +237,7 @@ export function renderPlatformChrome(profile, active) {
 
         <div class="gm-sidebar__label">Platform</div>
         <ul class="navbar-nav">
-          ${PLATFORM_NAV.map((n) => `
+          ${nav.map((n) => `
             <li class="nav-item${n.key === active ? ' active' : ''}">
               <a class="nav-link" href="${n.href}"${n.key === active ? ' aria-current="page"' : ''}>
                 <span class="nav-link-icon"><i class="ti ti-${n.icon}"></i></span>
@@ -261,12 +266,12 @@ export function renderPlatformChrome(profile, active) {
               <span class="avatar avatar-sm bg-primary-lt">${esc(initials)}</span>
               <div class="d-none d-xl-block ps-2">
                 <div>${esc(profile.name)}</div>
-                <div class="mt-1 small text-secondary">Platform admin</div>
+                <div class="mt-1 small text-secondary">${esc(roleLabel)}</div>
               </div>
             </a>
             <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
               <span class="dropdown-header">${esc(profile.name)}</span>
-              <span class="dropdown-item-text small text-secondary pb-2">Platform admin</span>
+              <span class="dropdown-item-text small text-secondary pb-2">${esc(roleLabel)}</span>
               <div class="dropdown-divider"></div>
               <a href="account.html" class="dropdown-item">
                 <i class="ti ti-lock me-2"></i> Change password

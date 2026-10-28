@@ -3,7 +3,7 @@
 // place with approve/reject actions, so there is exactly one place to act
 // and one place to look things up.
 
-import { requirePlatformAdmin } from '../auth.js';
+import { requirePlatformReader } from '../auth.js';
 import {
   renderPlatformChrome, applyTheme, pageHeader, esc, showError, spinner, emptyState
 } from '../lib/ui.js';
@@ -21,7 +21,7 @@ init();
 
 async function init() {
   try {
-    profile = await requirePlatformAdmin();
+    profile = await requirePlatformReader();
     renderPlatformChrome(profile, 'houses');
     await load();
   } catch (e) {

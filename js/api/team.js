@@ -24,8 +24,11 @@ async function createAuthAccount(email, password) {
   return data.user.id;
 }
 
-// mandirId/role are omitted for a fellow platform admin account.
-export async function createUser({ email, password, fullName, mandirId, role, platformAdmin = false }) {
+// mandirId/role are omitted for a platform-level account (platformAdmin
+// or nimittSevak).
+export async function createUser({
+  email, password, fullName, mandirId, role, platformAdmin = false, nimittSevak = false
+}) {
   const userId = await createAuthAccount(email, password);
   return unwrap(
     await sb.rpc('admin_create_user', {
@@ -33,19 +36,22 @@ export async function createUser({ email, password, fullName, mandirId, role, pl
       p_full_name: fullName,
       p_mandir_id: mandirId ?? null,
       p_role: role ?? null,
-      p_platform_admin: platformAdmin
+      p_platform_admin: platformAdmin,
+      p_nimitt_sevak: nimittSevak
     })
   );
 }
 
 // Every account on the platform — RLS on app_users grants this to a
-// platform admin alone. Account metadata only: name, role, which house,
-// never that house's members, sabhas or attendance.
+// platform admin alone (not a nimitt sevak — they have no reason to see
+// the team list, only Dashboard and All Houses). Account metadata only:
+// name, role, which house, never that house's members, sabhas or
+// attendance.
 export async function listAllUsers() {
   return unwrap(
     await sb
       .from('app_users')
-      .select('id, full_name, role, platform_admin, mandir_id, status, mandirs(ghar_name), created_at')
+      .select('id, full_name, role, platform_admin, nimitt_sevak, mandir_id, status, mandirs(ghar_name), created_at')
       .order('created_at', { ascending: false })
   );
 }
@@ -66,4 +72,8 @@ export async function setUserStatus(userId, status) {
 
 export async function setPlatformAdmin(userId, flag) {
   return unwrap(await sb.rpc('admin_set_platform_admin', { p_user_id: userId, p_flag: flag }));
+}
+
+export async function setNimittSevak(userId, flag) {
+  return unwrap(await sb.rpc('admin_set_nimitt_sevak', { p_user_id: userId, p_flag: flag }));
 }

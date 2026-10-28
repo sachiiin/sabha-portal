@@ -10,7 +10,7 @@
 // helpers — only the database side had to learn to allow the reads, in
 // sql/15-platform-house-view.sql and sql/16-platform-house-view-absences.sql.
 
-import { requirePlatformAdmin } from '../auth.js';
+import { requirePlatformReader } from '../auth.js';
 import {
   renderPlatformChrome, applyTheme, pageHeader, esc, toast, showError, spinner,
   emptyState, statusDot, statusLegend
@@ -45,7 +45,7 @@ init();
 async function init() {
   try {
     if (!mandirId) throw new Error('No house specified.');
-    profile = await requirePlatformAdmin();
+    profile = await requirePlatformReader();
     renderPlatformChrome(profile, 'houses');
     await load();
   } catch (e) {

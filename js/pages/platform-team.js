@@ -7,7 +7,7 @@ import {
   renderPlatformChrome, applyTheme, pageHeader, esc, toast, showError, spinner
 } from '../lib/ui.js';
 import { listMandirs } from '../api/mandirs.js';
-import { listAllUsers, createUser, reassignUser, setPlatformAdmin } from '../api/team.js';
+import { listAllUsers, createUser, reassignUser, setPlatformAdmin, setNimittSevak } from '../api/team.js';
 import { formatLong } from '../lib/dates.js';
 
 applyTheme();
@@ -37,7 +37,7 @@ async function load() {
 function render() {
   main.innerHTML = `
     ${pageHeader('Team & Users', 'Platform admins see this page; everyone else signs into their own house.')}
-    ${platformAdminsCard()}
+    ${platformTeamCard()}
     ${houseUsersCard()}`;
 
   main.querySelectorAll('[data-demote]').forEach((b) =>
@@ -53,46 +53,59 @@ function render() {
   document.getElementById('add-user-form').addEventListener('submit', onAddUser);
 }
 
-/* ---------- platform admins ---------- */
+/* ---------- platform team: admins + nimitt sevaks ---------- */
 
-function platformAdminsCard() {
-  const admins = users.filter((u) => u.platform_admin);
+const PLATFORM_ROLE_BADGE = { admin: 'bg-primary-lt', nimitt_sevak: 'bg-secondary-lt' };
+const PLATFORM_ROLE_LABEL = { admin: 'Admin', nimitt_sevak: 'Nimitt Sevak' };
+
+function platformTeamCard() {
+  const team = users.filter((u) => u.platform_admin || u.nimitt_sevak);
 
   return `<div class="card mb-3">
-    <div class="card-header"><h3 class="card-title">Platform admins</h3></div>
-    <div class="list-group list-group-flush">${admins.map(adminRow).join('')}</div>
+    <div class="card-header"><h3 class="card-title">Platform team</h3></div>
+    <div class="list-group list-group-flush">${team.map(platformRow).join('')}</div>
     <div class="card-body border-top">
-      <div class="hr-text hr-text-left mb-2">Add a platform admin</div>
+      <div class="hr-text hr-text-left mb-2">Add to the platform team</div>
       <form id="add-admin-form" class="row g-2">
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-3">
           <input type="text" id="pa-name" class="form-control" placeholder="Full name" required>
         </div>
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-3">
           <input type="email" id="pa-email" class="form-control" placeholder="Email" required>
         </div>
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-2">
           <input type="password" id="pa-password" class="form-control" placeholder="Starting password"
                  minlength="6" required>
         </div>
-        <div class="col-12 col-md-1">
+        <div class="col-6 col-md-3">
+          <select id="pa-role" class="form-select">
+            <option value="admin">Platform Admin</option>
+            <option value="nimitt_sevak">Nimitt Sevak</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-1">
           <button type="submit" class="btn btn-primary w-100" aria-label="Add">
             <i class="ti ti-plus"></i>
           </button>
         </div>
       </form>
       <small class="form-hint">
+        A Nimitt Sevak sees Dashboard and All Houses only — not Approvals or Team &amp; Users.
         They can change this password from their own account menu once signed in.
       </small>
     </div>
   </div>`;
 }
 
-function adminRow(u) {
+function platformRow(u) {
   const self = u.id === profile.id;
+  const kind = u.platform_admin ? 'admin' : 'nimitt_sevak';
   return `<div class="list-group-item d-flex align-items-center justify-content-between gap-2">
     <div>
       <div class="fw-medium">
-        ${esc(u.full_name)}${self ? ' <span class="badge bg-primary-lt ms-1">You</span>' : ''}
+        ${esc(u.full_name)}
+        <span class="badge ${PLATFORM_ROLE_BADGE[kind]} ms-1">${PLATFORM_ROLE_LABEL[kind]}</span>
+        ${self ? ' <span class="badge bg-primary-lt ms-1">You</span>' : ''}
       </div>
       <div class="text-secondary small">Since ${esc(formatLong(u.created_at.slice(0, 10)))}</div>
     </div>
@@ -102,11 +115,13 @@ function adminRow(u) {
 }
 
 async function demote(id) {
-  if (!confirm('Remove platform admin access for this account?')) return;
+  const u = users.find((x) => x.id === id);
+  if (!confirm('Remove platform access for this account?')) return;
   try {
-    await setPlatformAdmin(id, false);
+    if (u?.platform_admin) await setPlatformAdmin(id, false);
+    else await setNimittSevak(id, false);
     await load();
-    toast('Platform admin access removed', 'success');
+    toast('Platform access removed', 'success');
   } catch (e) {
     toast(e.message, 'error');
   }
@@ -117,14 +132,19 @@ async function onAddAdmin(e) {
   const fullName = document.getElementById('pa-name').value.trim();
   const email = document.getElementById('pa-email').value.trim();
   const password = document.getElementById('pa-password').value;
+  const role = document.getElementById('pa-role').value;
   if (!fullName || !email || !password) return toast('Fill in every field.', 'error');
 
   const btn = e.target.querySelector('button[type="submit"]');
   btn.disabled = true;
   try {
-    await createUser({ email, password, fullName, platformAdmin: true });
+    await createUser({
+      email, password, fullName,
+      platformAdmin: role === 'admin',
+      nimittSevak: role === 'nimitt_sevak'
+    });
     await load();
-    toast(`${fullName} can now sign in as a platform admin.`, 'success');
+    toast(`${fullName} can now sign in as ${role === 'admin' ? 'a platform admin' : 'a Nimitt Sevak'}.`, 'success');
   } catch (ex) {
     toast(ex.message, 'error');
     btn.disabled = false;
@@ -136,7 +156,7 @@ async function onAddAdmin(e) {
 const ROLE_BADGE = { admin: 'bg-primary-lt', sevak: 'bg-secondary-lt' };
 
 function houseUsersCard() {
-  const rows = users.filter((u) => !u.platform_admin && u.role !== 'viewer');
+  const rows = users.filter((u) => !u.platform_admin && !u.nimitt_sevak && u.role !== 'viewer');
 
   return `<div class="card">
     <div class="card-header"><h3 class="card-title">Sevaks &amp; house admins</h3></div>

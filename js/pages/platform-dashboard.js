@@ -2,7 +2,7 @@
 // own people see, either combined across every approved house, or
 // narrowed to one with the House filter beside the page title.
 
-import { requirePlatformAdmin } from '../auth.js';
+import { requirePlatformReader } from '../auth.js';
 import { renderPlatformChrome, applyTheme, pageHeader, esc, showError, spinner } from '../lib/ui.js';
 import { mountHouseDashboard, fetchHouseScope, mergeHouseScopes } from '../lib/house-dashboard.js';
 import { listMandirs } from '../api/mandirs.js';
@@ -19,7 +19,7 @@ init();
 
 async function init() {
   try {
-    profile = await requirePlatformAdmin();
+    profile = await requirePlatformReader();
     renderPlatformChrome(profile, 'dashboard');
 
     mandirs = await listMandirs();

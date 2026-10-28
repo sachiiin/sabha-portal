@@ -123,7 +123,7 @@ export async function getProfile() {
 
   const { data: row, error } = await sb
     .from('app_users')
-    .select('id, full_name, role, platform_admin, mandir_id, status, mandirs(name, ghar_name, status)')
+    .select('id, full_name, role, platform_admin, nimitt_sevak, mandir_id, status, mandirs(name, ghar_name, status)')
     .eq('id', session.user.id)
     .maybeSingle();
 
@@ -135,6 +135,7 @@ export async function getProfile() {
     name: row.full_name,
     role: row.role,
     platformAdmin: row.platform_admin,
+    nimittSevak: row.nimitt_sevak,
     mandirId: row.mandir_id,
     mandirName: row.mandirs?.name ?? 'Gharmandir',
     gharName: row.mandirs?.ghar_name ?? '',
@@ -181,13 +182,14 @@ export async function requireAuth({ write = false } = {}) {
     throw new Error('no app_users row for this account');
   }
 
-  // The platform admin's area is a separate shell entirely (see
-  // renderPlatformChrome in ui.js) — a platform admin account never sees
-  // a mandir's own dashboard, roster or anything else, even if it also
-  // happens to carry a mandir_id from before it had this flag.
-  if (profile.platformAdmin) {
+  // The platform area is a separate shell entirely (see
+  // renderPlatformChrome in ui.js) — neither a platform admin nor a
+  // nimitt sevak ever sees a mandir's own dashboard, roster or anything
+  // else, even if the account also happens to carry a mandir_id from
+  // before it had this flag.
+  if (profile.platformAdmin || profile.nimittSevak) {
     window.location.href = 'platform-dashboard.html';
-    throw new Error('platform admin — use the platform dashboard instead');
+    throw new Error('platform account — use the platform dashboard instead');
   }
 
   // A brand-new mandir from register_mandir() starts 'pending', and stays
@@ -219,6 +221,9 @@ export async function requireAuth({ write = false } = {}) {
 // The platform admin pages' own guard, in place of requireAuth() — a
 // platform admin has no mandir to redirect "write" or approval checks
 // against, so it doesn't share requireAuth()'s logic, just its shape.
+// Strictly a full platform admin — Approvals and Team & Users use this,
+// so a nimitt sevak bounces off both (back to index.html, which then
+// sends them on to platform-dashboard.html via the check above).
 export async function requirePlatformAdmin() {
   const session = await getSession();
   if (!session) {
@@ -230,6 +235,25 @@ export async function requirePlatformAdmin() {
   if (!profile?.platformAdmin) {
     window.location.href = 'index.html?e=forbidden';
     throw new Error('not a platform admin');
+  }
+
+  return profile;
+}
+
+// The read-only platform pages' guard — Dashboard, All Houses and a
+// single house's detail view — open to a full platform admin OR a
+// nimitt sevak alike.
+export async function requirePlatformReader() {
+  const session = await getSession();
+  if (!session) {
+    window.location.href = 'login.html';
+    throw new Error('not authenticated');
+  }
+
+  const profile = await getProfile();
+  if (!profile?.platformAdmin && !profile?.nimittSevak) {
+    window.location.href = 'index.html?e=forbidden';
+    throw new Error('not a platform account');
   }
 
   return profile;
@@ -249,6 +273,10 @@ export function isAdmin(profile) {
 
 export function isPlatformAdmin(profile) {
   return Boolean(profile?.platformAdmin);
+}
+
+export function isNimittSevak(profile) {
+  return Boolean(profile?.nimittSevak);
 }
 
 export function isViewer(profile) {

@@ -55,8 +55,8 @@ function statCard(label, value, icon, tone = 'primary') {
 function summary() {
   const approved = mandirs.filter((m) => m.status === 'approved');
   const pending = mandirs.filter((m) => m.status === 'pending');
-  const platformAdmins = users.filter((u) => u.platform_admin);
-  const houseUsers = users.filter((u) => !u.platform_admin);
+  const platformTeam = users.filter((u) => u.platform_admin || u.nimitt_sevak);
+  const houseUsers = users.filter((u) => !u.platform_admin && !u.nimitt_sevak);
   const recent = [...mandirs].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 6);
 
   return `
@@ -79,8 +79,8 @@ function summary() {
         <div class="card">
           <div class="card-header"><h3 class="card-title">Team</h3></div>
           <div class="card-body">
-            <div class="text-secondary small text-uppercase">Platform admins</div>
-            <div class="h3">${platformAdmins.length}</div>
+            <div class="text-secondary small text-uppercase">Platform team</div>
+            <div class="h3">${platformTeam.length}</div>
             <div class="text-secondary small text-uppercase mt-3">Sevaks &amp; house admins</div>
             <div class="h3">${houseUsers.length}</div>
           </div>
@@ -117,11 +117,11 @@ const STATUS_BADGE = {
 // person, not the house, which is why it's app_users.status and not
 // mandirs.status. See sql/18-house-join-requests.sql.
 function joinRequests() {
-  return users.filter((u) => u.status === 'pending' && !u.platform_admin && u.mandir_id);
+  return users.filter((u) => u.status === 'pending' && !u.platform_admin && !u.nimitt_sevak && u.mandir_id);
 }
 
 function blockedUsers() {
-  return users.filter((u) => u.status === 'blocked' && !u.platform_admin);
+  return users.filter((u) => u.status === 'blocked' && !u.platform_admin && !u.nimitt_sevak);
 }
 
 function peopleSection() {
