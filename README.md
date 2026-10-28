@@ -75,7 +75,8 @@ sabha-portal/
     ├── 17-mandal-options.sql      this house's mandal categories
     ├── 18-house-join-requests.sql join an existing house instead of registering a new one
     ├── 19-structured-address.sql  street/city/province/postal code instead of free text + Places
-    └── 20-nimitt-sevak.sql        read-only platform role: Dashboard + All Houses, nothing else
+    ├── 20-nimitt-sevak.sql        read-only platform role: Dashboard + All Houses, nothing else
+    └── 21-finish-pending-signup.sql  finish registering/joining from JWT metadata, any device
 ```
 
 ## Setup
@@ -158,10 +159,13 @@ Any static server works — `npx serve`, `php -S localhost:8000`, or the
 VS Code Live Server extension.
 
 If *Confirm email* is on, `register.html` still finishes the job — it just
-can't call `register_mandir()` until a session exists, so it stashes the
-form's details in `sessionStorage` and finishes registering automatically
-the next time that browser has a signed-in session with no mandir attached
-yet, which in practice is right after confirming and signing in.
+can't call `register_mandir()` until a session exists. The registration
+details travel as Supabase user metadata on the signed-up account instead
+of browser storage, so `finish_pending_signup()` (`sql/21`) can read them
+back out of the JWT and finish the job the moment a session with no
+app_users row shows up — which could be a completely different device
+than the one that filled out the form, e.g. confirming from a phone's
+mail app after registering on a desktop.
 
 Accounts created from **Team & Users** work the same way: if *Confirm
 email* is on, that person needs to click the link in their confirmation

@@ -10,43 +10,18 @@
 // before rendering.
 //
 // A third way in, register.html: signs up a brand-new auth user with no
-// app_users row at all, then calls register_mandir() to create one. If
-// Supabase is set to require email confirmation, that second step can't
-// happen until a session exists, which may be a later page load — see
-// stashPendingRegistration() below.
+// app_users row at all, carrying what to do once a session exists as
+// Supabase user metadata (the `metadata` argument to signUp() below).
+// Postgres reads that straight back out of the JWT in
+// finish_pending_signup() (sql/21) whenever getProfile() below finds a
+// session with no app_users row — including right after confirming an
+// email on a completely different device than the one that registered,
+// which a sessionStorage-based version of this could never survive.
 
 import { sb, unwrap, loginRedirectUrl } from './supabase.js';
-import { registerMandir, joinMandir } from './api/mandirs.js';
+import { finishPendingSignup } from './api/mandirs.js';
 
 let cachedProfile = null;
-
-const PENDING_KEY = 'gm-pending-registration';
-
-// Called by register.js when signUp() doesn't hand back a session right
-// away (email confirmation is on). Stashes the mandir details so the next
-// requireAuth() that finds a session but no app_users row — which happens
-// right after the admin confirms and signs in — can finish the job instead
-// of just bouncing them to the ordinary "not linked" error.
-export function stashPendingRegistration(fields) {
-  try { sessionStorage.setItem(PENDING_KEY, JSON.stringify({ kind: 'register', ...fields })); } catch {}
-}
-
-// Same idea, for someone joining a house that already exists instead of
-// registering a new one — see register.html's duplicate-house check.
-export function stashPendingJoin(mandirId, adminName) {
-  try { sessionStorage.setItem(PENDING_KEY, JSON.stringify({ kind: 'join', mandirId, adminName })); } catch {}
-}
-
-function takePendingRegistration() {
-  try {
-    const raw = sessionStorage.getItem(PENDING_KEY);
-    if (!raw) return null;
-    sessionStorage.removeItem(PENDING_KEY);
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
 
 export async function signIn(email, password) {
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
@@ -55,13 +30,16 @@ export async function signIn(email, password) {
   return data.user;
 }
 
-// Creates the account a brand-new mandir's first admin signs in with.
-// Returns a null session when the Supabase project requires email
-// confirmation — register.js stashes the mandir details for that case.
-export async function signUp(email, password) {
+// Creates the account a brand-new mandir's first admin (or someone
+// joining an existing house) signs in with. `metadata` carries what to
+// do once a session exists — { kind: 'register', ...fields } or
+// { kind: 'join', mandirId, adminName } — for finish_pending_signup() to
+// read back out of the JWT later. Returns a null session when the
+// Supabase project requires email confirmation.
+export async function signUp(email, password, metadata) {
   const { data, error } = await sb.auth.signUp({
     email, password,
-    options: { emailRedirectTo: loginRedirectUrl() }
+    options: { emailRedirectTo: loginRedirectUrl(), ...(metadata ? { data: metadata } : {}) }
   });
   if (error) throw new Error(error.message);
   cachedProfile = null;
@@ -157,20 +135,14 @@ export async function requireAuth({ write = false } = {}) {
   let profile = await getProfile();
 
   if (!profile) {
-    const pending = takePendingRegistration();
-    if (pending) {
-      try {
-        if (pending.kind === 'join') {
-          await joinMandir(pending.mandirId, pending.adminName);
-        } else {
-          await registerMandir(pending);
-        }
-        cachedProfile = null;
-        profile = await getProfile();
-      } catch {
-        // Falls through to the ordinary nolink handling below — most
-        // likely this account already finished registering elsewhere.
-      }
+    try {
+      await finishPendingSignup();
+      cachedProfile = null;
+      profile = await getProfile();
+    } catch {
+      // No pending registration/join metadata on this account, or it
+      // already finished elsewhere — falls through to the ordinary
+      // nolink handling below.
     }
   }
 

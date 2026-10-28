@@ -23,6 +23,17 @@ export async function registerMandir({
   );
 }
 
+// Called by requireAuth() for a signed-in account with no app_users row
+// yet — reads whatever registration/join details signUp() attached as
+// user metadata (see js/auth.js's signUp()) straight out of this
+// session's own JWT and finishes the job, on whichever device that
+// happens to be. Replaces a sessionStorage-based version that silently
+// failed whenever the confirmation link was opened somewhere other than
+// the browser tab that submitted the form — see sql/21.
+export async function finishPendingSignup() {
+  return unwrap(await sb.rpc('finish_pending_signup'));
+}
+
 // Called from register.html as soon as someone types a house name and
 // address, so a second person from a house that already registered gets
 // offered "join this house" instead of silently creating a duplicate

@@ -135,8 +135,8 @@
 </div>
 
 <script type="module">
-import { signUp, stashPendingRegistration, stashPendingJoin } from './js/auth.js';
-import { registerMandir, findRegisteredMandir, joinMandir } from './js/api/mandirs.js';
+import { signUp } from './js/auth.js';
+import { finishPendingSignup, findRegisteredMandir } from './js/api/mandirs.js';
 import { applyTheme, MARK_SVG } from './js/lib/ui.js';
 import {
   provinceOptionsHTML, syncCityOptions, OTHER_CITY, formatPostalCode, isValidPostalCode
@@ -224,20 +224,22 @@ let pendingFields = null;
 let pendingPassword = null;
 let pendingMatch = null;
 
+// The registration/join details travel as signUp()'s user metadata —
+// Postgres reads them back out of the JWT in finish_pending_signup()
+// (sql/21) whenever a session shows up with no app_users row yet,
+// whether that's right here (confirmation off) or later, possibly on a
+// completely different device, once the confirmation link is clicked.
+
 async function finishRegister(fields, password) {
-  const { session } = await signUp(fields.contactEmail, password);
+  const { session } = await signUp(fields.contactEmail, password, { kind: 'register', ...fields });
 
   if (session) {
-    await registerMandir(fields);
+    await finishPendingSignup();
     showDone(
       'Thanks — you’re on the list',
       `${fields.gharName} is waiting for a platform admin to approve it. Sign in any time to check on it.`
     );
   } else {
-    // Email confirmation is on for this project — finish registering
-    // the next time requireAuth() sees this account signed in with a
-    // session, which happens right after they confirm and sign in.
-    stashPendingRegistration(fields);
     showDone(
       'Confirm your email',
       `We've sent a confirmation link to ${fields.contactEmail}. Once you confirm it, sign in and we'll finish setting up ${fields.gharName}.`
@@ -246,16 +248,17 @@ async function finishRegister(fields, password) {
 }
 
 async function finishJoin(match, fields, password) {
-  const { session } = await signUp(fields.contactEmail, password);
+  const { session } = await signUp(fields.contactEmail, password, {
+    kind: 'join', mandirId: match.id, adminName: fields.adminName
+  });
 
   if (session) {
-    await joinMandir(match.id, fields.adminName);
+    await finishPendingSignup();
     showDone(
       'Thanks — request sent',
       `A platform admin needs to approve you joining ${match.ghar_name}. Sign in any time to check on it.`
     );
   } else {
-    stashPendingJoin(match.id, fields.adminName);
     showDone(
       'Confirm your email',
       `We've sent a confirmation link to ${fields.contactEmail}. Once you confirm it, sign in and we'll send your request to join ${match.ghar_name}.`
