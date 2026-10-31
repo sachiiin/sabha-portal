@@ -24,7 +24,7 @@ begin
   end if;
 
   return query
-    select au.mandir_id, au.full_name, u.email
+    select au.mandir_id, au.full_name, u.email::text
     from app_users au
     join auth.users u on u.id = au.id
     where au.role = 'admin'
