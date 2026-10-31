@@ -93,17 +93,18 @@ function render() {
                   ${pinOn ? 'New PIN' : 'Set a PIN'}
                 </label>
                 <input type="text" id="pin" class="form-control" autocomplete="off"
-                       inputmode="numeric" placeholder="At least 4 characters">
+                       inputmode="numeric" maxlength="6" placeholder="6 digits">
                 <small class="form-hint">
-                  Six digits is plenty. Share it with the sevako along with your ghar
-                  name, "${esc(profile.gharName)}" — signing in with the PIN takes
-                  both, and this page cannot show the PIN to you again.
+                  Exactly 6 digits, and not 0, 3, 6 and 9 together in a row (in any
+                  order). Share it with the sevako along with your ghar name,
+                  "${esc(profile.gharName)}" — signing in with the PIN takes both,
+                  and this page cannot show the PIN to you again.
                 </small>
               </div>
               <div class="mb-3">
                 <label class="form-label" for="pin2">Confirm</label>
                 <input type="text" id="pin2" class="form-control" autocomplete="off"
-                       inputmode="numeric">
+                       inputmode="numeric" maxlength="6">
               </div>
               <div class="btn-list">
                 <button type="submit" class="btn btn-primary">
@@ -271,6 +272,17 @@ async function onSaveAddress(ev) {
   }
 }
 
+// True if any 4 consecutive digits, in any order, are exactly {0,3,6,9} —
+// 0369, 0936, 9036, 3609, etc. all match; 361809 does not, since those
+// four digits never sit next to each other. Mirrors set_house_pin()'s
+// own check in sql/23-pin-rules.sql, which is the real enforcement.
+function hasForbiddenPinPattern(pin) {
+  for (let i = 0; i <= pin.length - 4; i++) {
+    if (pin.slice(i, i + 4).split('').sort().join('') === '0369') return true;
+  }
+  return false;
+}
+
 async function onSetPin(ev) {
   ev.preventDefault();
 
@@ -285,7 +297,10 @@ async function onSetPin(ev) {
     toast(msg, 'error');
   };
 
-  if (pin.length < 4) return invalid(a, 'The PIN needs at least 4 characters.');
+  if (!/^[0-9]{6}$/.test(pin)) return invalid(a, 'The PIN must be exactly 6 digits.');
+  if (hasForbiddenPinPattern(pin)) {
+    return invalid(a, 'The PIN cannot have 0, 3, 6 and 9 together in a row, in any order.');
+  }
   if (pin !== b.value.trim()) return invalid(b, 'The two PINs do not match.');
 
   try {
