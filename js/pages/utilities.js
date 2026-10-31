@@ -561,7 +561,7 @@ function awayCard() {
           <label class="form-label required" for="a-member">Yuvak</label>
           <select id="a-member" class="form-select" required>
             <option value="">Choose…</option>
-            ${members.map((m) =>
+            ${members.filter(isCurrent).map((m) =>
               `<option value="${m.id}">${esc(m.full_name)}</option>`).join('')}
           </select>
         </div>
