@@ -67,12 +67,15 @@ export async function signInWithPin(gharName, pin) {
   });
 
   if (error) {
+    // Leave no dangling anonymous account behind a failed attempt — see
+    // sql/25-cleanup-anonymous-pin-accounts.sql.
+    await cleanupAnonymousAccount();
     await sb.auth.signOut();
     throw new Error(error.message);
   }
 
   if (data !== true) {
-    // Leave no dangling anonymous session behind a wrong guess.
+    await cleanupAnonymousAccount();
     await sb.auth.signOut();
     throw new Error('That house name and PIN don’t match.');
   }
@@ -81,7 +84,18 @@ export async function signInWithPin(gharName, pin) {
   return true;
 }
 
+// Quietly deletes the caller's own account, but only if it's genuinely
+// anonymous (a PIN session) — a no-op for every other account type, so
+// this is always safe to call regardless of who's signing out. Without
+// it, every PIN session leaves a permanent, unused row in auth.users,
+// since actually removing one needs the Supabase admin API (the secret
+// key), which this static site never ships to the browser.
+async function cleanupAnonymousAccount() {
+  try { await sb.rpc('delete_own_anonymous_account'); } catch {}
+}
+
 export async function signOut() {
+  await cleanupAnonymousAccount();
   await sb.auth.signOut();
   cachedProfile = null;
   window.location.href = 'login.html';
