@@ -197,6 +197,7 @@ function sabhasCard() {
           <div>${esc(formatShort(s.sabha_date))}
             <span class="text-secondary small text-capitalize ms-1">${esc(s.sabha_type)}</span>
           </div>
+          ${s.topic ? `<div class="text-secondary small text-truncate">${esc(s.topic)}</div>` : ''}
         </div>
         <div class="col-auto">
           ${s.is_cancelled
@@ -228,6 +229,10 @@ function summary(mstats) {
 }
 
 function render() {
+  // The browser's "Save as PDF" suggests the document's <title> as the
+  // filename, so this is what the downloaded PDF ends up called.
+  document.title = `${profile.gharName} - ${monthName(month)} Sabha Report`;
+
   const mstats = memberMonthlyStats();
   const stat = summary(mstats);
 
