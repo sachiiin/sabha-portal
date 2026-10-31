@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<title>Monthly report &middot; Sabha</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/css/tabler.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="gm-report-toolbar gm-noprint">
+  <a href="history.html" class="btn btn-sm">
+    <i class="ti ti-arrow-left me-1"></i> Back to History
+  </a>
+  <select id="report-month" class="form-select form-select-sm" style="width:auto"></select>
+  <button type="button" class="btn btn-primary btn-sm" id="report-print">
+    <i class="ti ti-printer me-1"></i> Print / Save as PDF
+  </button>
+</div>
+
+<div id="report-root" class="gm-report">
+  <div class="text-center py-6 text-secondary">
+    <span class="spinner-border spinner-border-sm me-2"></span>Loading
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tabler/core@1/dist/js/tabler.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.1/dist/apexcharts.min.js" defer></script>
+<script type="module" src="js/pages/report.js"></script>
+</body>
+</html>

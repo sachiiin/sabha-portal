@@ -623,3 +623,61 @@ body.gm-mini .gm-sidebar .nav-link-icon { font-size: 1.25rem; }
 /* A yuvak on this bill who has since moved out — he needs the bill sent
    to him rather than mentioned at sabha. */
 .gm-moved > td:first-child { font-weight: 500; }
+
+/* ---------- printable monthly report (report.html) ---------- */
+/* Deliberately not theme-aware — always the light/navy brand colours,
+   fixed hex values rather than the --tblr-* variables, since a printed
+   document should look the same no matter who generated it or what mode
+   their screen was in. */
+
+.gm-report-toolbar {
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+  padding: .85rem 1.25rem;
+  background: #fff7e8; border-bottom: 1px solid #e9e1d0;
+  position: sticky; top: 0; z-index: 10;
+}
+.gm-report-toolbar select { margin-left: auto; }
+
+.gm-report {
+  max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 3rem;
+  background: #fff7e8; color: #1a1a1a; min-height: 100vh;
+}
+
+.gm-report-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap;
+  padding: 1.75rem; margin-bottom: 1.5rem; border-radius: 16px;
+  background: linear-gradient(135deg, #0b1130, #1c2456);
+  color: #fff;
+}
+.gm-report-brand { display: flex; align-items: center; gap: .9rem; }
+.gm-report-title {
+  font-family: 'Instrument Serif', Georgia, serif; font-size: 1.6rem; line-height: 1.15;
+}
+.gm-report-subtitle {
+  font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; opacity: .75;
+}
+.gm-report-meta { text-align: right; }
+.gm-report-month {
+  font-family: 'Instrument Serif', Georgia, serif; font-size: 1.35rem;
+}
+.gm-report-generated { font-size: .8rem; opacity: .7; }
+
+.gm-report .card { background: #fff; border-color: #e9e1d0; }
+
+.gm-report-footer {
+  margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e9e1d0;
+  text-align: center; font-size: .8rem; color: #8a8a8a;
+}
+
+@media print {
+  .gm-noprint { display: none !important; }
+  body { background: #fff !important; }
+  .gm-report { max-width: none; padding: 0; margin: 0; min-height: 0; }
+  .gm-report-header, .card, tr { break-inside: avoid; }
+  * {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  @page { margin: 14mm 12mm; }
+}

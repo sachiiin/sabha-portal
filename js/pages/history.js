@@ -76,6 +76,8 @@ function render() {
   main.innerHTML = `
     ${pageHeader('History', `${sabhas.length} sabhas recorded`, actions)}
 
+    ${reportCard()}
+
     <div class="card mb-3" id="grid-card">${gridCard()}</div>
 
     ${awayCard()}
@@ -109,6 +111,39 @@ function render() {
   });
 
   wireGrid();
+  wireReportCard();
+}
+
+// A decorative, printable attendance report for one month — opens in its
+// own chrome-less page (report.html) meant to be printed or saved as a PDF.
+function reportCard() {
+  const months = [...new Set(
+    sabhas.filter((s) => !s.is_cancelled).map((s) => monthKey(s.sabha_date))
+  )].sort().reverse();
+  if (!months.length) return '';
+
+  return `<div class="card mb-3">
+    <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+      <div class="flex-fill">
+        <div class="fw-medium"><i class="ti ti-file-type-pdf me-1"></i> Monthly report</div>
+        <div class="text-secondary small">A printable attendance report for one month — counts, percentages and charts.</div>
+      </div>
+      <select id="report-month" class="form-select form-select-sm" style="width:auto">
+        ${months.map((k) => `<option value="${k}">${esc(monthName(k))}</option>`).join('')}
+      </select>
+      <a class="btn btn-primary btn-sm" id="report-link" href="report.html?month=${months[0]}">
+        <i class="ti ti-download me-1"></i> Download report
+      </a>
+    </div>
+  </div>`;
+}
+
+function wireReportCard() {
+  const monthSelect = document.getElementById('report-month');
+  const link = document.getElementById('report-link');
+  monthSelect?.addEventListener('change', () => {
+    link.href = `report.html?month=${monthSelect.value}`;
+  });
 }
 
 // The grid card redraws on its own when the month changes — the rest of
