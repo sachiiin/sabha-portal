@@ -44,8 +44,8 @@
           <form id="pin-form" novalidate>
             <div class="mb-3">
               <label class="form-label" for="ghar-name">House name</label>
-              <input type="text" id="ghar-name" class="form-control"
-                     placeholder="e.g. Dasanudas" autocomplete="off" required>
+              <input type="text" id="ghar-name" class="form-control text-uppercase"
+                     placeholder="e.g. DASANUDAS" autocomplete="off" required>
             </div>
             <div class="mb-3">
               <label class="form-label" for="pin">House PIN</label>
@@ -225,6 +225,12 @@ const pinInput = document.getElementById('pin');
 const pinSubmit = document.getElementById('pin-submit');
 
 pinForm.addEventListener('input', clearError);
+
+gharNameInput.addEventListener('input', () => {
+  const pos = gharNameInput.selectionStart;
+  gharNameInput.value = gharNameInput.value.toUpperCase();
+  gharNameInput.selectionStart = gharNameInput.selectionEnd = pos;
+});
 
 pinForm.addEventListener('submit', async (e) => {
   e.preventDefault();
