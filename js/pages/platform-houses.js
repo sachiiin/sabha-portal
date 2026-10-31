@@ -8,13 +8,13 @@ import {
   renderPlatformChrome, applyTheme, pageHeader, esc, showError, spinner, emptyState
 } from '../lib/ui.js';
 import { listMandirs } from '../api/mandirs.js';
-import { listAllUsers } from '../api/team.js';
+import { listAllUsers, listHouseAdmins } from '../api/team.js';
 import { formatLong } from '../lib/dates.js';
 
 applyTheme();
 
 const main = document.getElementById('main');
-let profile, mandirs, usersByMandir;
+let profile, mandirs, usersByMandir, houseAdmins;
 let tab = 'approved';
 
 init();
@@ -31,8 +31,9 @@ async function init() {
 
 async function load() {
   main.innerHTML = spinner;
-  const [allMandirs, users] = await Promise.all([listMandirs(), listAllUsers()]);
+  const [allMandirs, users, admins] = await Promise.all([listMandirs(), listAllUsers(), listHouseAdmins()]);
   mandirs = allMandirs;
+  houseAdmins = admins;
 
   usersByMandir = new Map();
   for (const u of users) {
@@ -41,6 +42,25 @@ async function load() {
   }
 
   render();
+}
+
+function adminsFor(mandirId) {
+  return houseAdmins.filter((a) => a.mandir_id === mandirId);
+}
+
+function adminsHTML(mandirId, m) {
+  const admins = adminsFor(mandirId);
+  if (admins.length) {
+    return admins.map((a) => `<div class="text-secondary small">
+      <i class="ti ti-user me-1"></i>${esc(a.full_name)} &middot;
+      <a href="mailto:${esc(a.email)}">${esc(a.email)}</a>
+    </div>`).join('');
+  }
+  if (!m.contact_name && !m.contact_email) return '';
+  return `<div class="text-secondary small">
+    <i class="ti ti-user me-1"></i>${esc(m.contact_name ?? '')}
+    ${m.contact_email ? ` &middot; <a href="mailto:${esc(m.contact_email)}">${esc(m.contact_email)}</a>` : ''}
+  </div>`;
 }
 
 const STATUS_BADGE = { pending: 'bg-orange-lt', approved: 'bg-success-lt', rejected: 'bg-danger-lt' };
@@ -106,10 +126,7 @@ function card(m) {
           <i class="ti ti-calendar me-1"></i>
           Registered ${esc(formatLong(m.created_at.slice(0, 10)))}
         </div>
-        ${m.contact_name || m.contact_email ? `<div class="text-secondary small">
-          <i class="ti ti-user me-1"></i>${esc(m.contact_name ?? '')}
-          ${m.contact_email ? ` &middot; <a href="mailto:${esc(m.contact_email)}">${esc(m.contact_email)}</a>` : ''}
-        </div>` : ''}
+        ${adminsHTML(m.id, m)}
       </div>
       <div class="card-footer">
         ${m.status === 'pending'

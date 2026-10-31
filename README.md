@@ -76,7 +76,8 @@ sabha-portal/
     ├── 18-house-join-requests.sql join an existing house instead of registering a new one
     ├── 19-structured-address.sql  street/city/province/postal code instead of free text + Places
     ├── 20-nimitt-sevak.sql        read-only platform role: Dashboard + All Houses, nothing else
-    └── 21-finish-pending-signup.sql  finish registering/joining from JWT metadata, any device
+    ├── 21-finish-pending-signup.sql  finish registering/joining from JWT metadata, any device
+    └── 22-platform-house-admins.sql  real admin name + email per house, for Approvals/All Houses
 ```
 
 ## Setup

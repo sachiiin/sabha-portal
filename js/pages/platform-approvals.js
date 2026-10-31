@@ -6,13 +6,13 @@ import {
   renderPlatformChrome, applyTheme, pageHeader, esc, toast, showError, spinner, emptyState
 } from '../lib/ui.js';
 import { listMandirs, setMandirStatus } from '../api/mandirs.js';
-import { listAllUsers, setUserStatus, reassignUser } from '../api/team.js';
+import { listAllUsers, setUserStatus, reassignUser, listHouseAdmins } from '../api/team.js';
 import { formatLong } from '../lib/dates.js';
 
 applyTheme();
 
 const main = document.getElementById('main');
-let profile, mandirs, users;
+let profile, mandirs, users, houseAdmins;
 let tab = 'pending';
 let reassigningId = null;
 
@@ -30,8 +30,30 @@ async function init() {
 
 async function load() {
   main.innerHTML = spinner;
-  [mandirs, users] = await Promise.all([listMandirs(), listAllUsers()]);
+  [mandirs, users, houseAdmins] = await Promise.all([listMandirs(), listAllUsers(), listHouseAdmins()]);
   render();
+}
+
+function adminsFor(mandirId) {
+  return houseAdmins.filter((a) => a.mandir_id === mandirId);
+}
+
+// Every active admin for this house, name + real sign-in email. Falls
+// back to the one-time registration contact only for the rare row with
+// no linked admin account at all (shouldn't normally happen — registering
+// always creates one — but better than showing nothing).
+function adminsHTML(mandirId, m) {
+  const admins = adminsFor(mandirId);
+  if (admins.length) {
+    return admins.map((a) => `<div class="text-secondary small">
+      ${esc(a.full_name)} &middot; <a href="mailto:${esc(a.email)}">${esc(a.email)}</a>
+    </div>`).join('');
+  }
+  if (!m.contact_name && !m.contact_email) return '';
+  return `<div class="text-secondary small">
+    ${esc(m.contact_name ?? '')}
+    ${m.contact_email ? ` &middot; <a href="mailto:${esc(m.contact_email)}">${esc(m.contact_email)}</a>` : ''}
+  </div>`;
 }
 
 function statCard(label, value, icon, tone = 'primary') {
@@ -329,10 +351,7 @@ function row(m) {
           ${m.address ? `${esc(m.address)} &middot; ` : ''}
           Registered ${esc(formatLong(m.created_at.slice(0, 10)))}
         </div>
-        <div class="text-secondary small">
-          ${esc(m.contact_name ?? '')}
-          ${m.contact_email ? ` &middot; <a href="mailto:${esc(m.contact_email)}">${esc(m.contact_email)}</a>` : ''}
-        </div>
+        ${adminsHTML(m.id, m)}
       </div>
       <div class="col-auto btn-list">${actions.join('')}</div>
     </div>

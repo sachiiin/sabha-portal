@@ -81,3 +81,12 @@ export async function setPlatformAdmin(userId, flag) {
 export async function setNimittSevak(userId, flag) {
   return unwrap(await sb.rpc('admin_set_nimitt_sevak', { p_user_id: userId, p_flag: flag }));
 }
+
+// Every house's active admin(s), with their real sign-in email — reads
+// auth.users via a security-definer function, since app_users has no
+// email column of its own. Platform admin or nimitt sevak only; used by
+// Approvals and All Houses to show who actually runs each house instead
+// of the one contact captured at registration time.
+export async function listHouseAdmins() {
+  return unwrap(await sb.rpc('platform_list_house_admins'));
+}
